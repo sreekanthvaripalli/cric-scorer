@@ -22,3 +22,110 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+.DS_Store
+
+
+# HeartbeatVault v2 — .gitignore
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.pprof
+bin/
+vendor/
+go.work.sum
+
+# Go service binaries
+/services/*/server
+services/*/server
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+.idea/
+# Flutter app: commit the lockfile so CI resolves exactly what local resolves
+# (LR-N3 — was gitignored, making CI builds time-dependent).
+*.lock
+!apps/mobile/pubspec.lock
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+config/firebase-service-account.json
+config/AuthKey.p8
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage.out
+coverage.html
+*.coverprofile
+test-results/
+junit.xml
+
+# Docker
+docker-compose.override.yml
+
+# Build Artifacts
+dist/
+*.tar.gz
+*.zip
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Node (Admin Web / Beneficiary Portal)
+node_modules/
+.next/
+out/
+.nuxt/
+dist/
+*.tsbuildinfo
+
+# Flutter
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Protobuf Generated (uncomment to ignore generated pb.go files)
+# *.pb.go
+# *_grpc.pb.go
+
+# Misc
+*.bak
+*.tmp
+*.orig
+.clinerules
+workflow-orchestration.md
+scripts/render-env-generate.sh
