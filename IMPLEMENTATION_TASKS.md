@@ -15,15 +15,15 @@
 **Dependencies:** None  
 **Deliverable:** Runnable local API skeleton
 
-- [ ] 1.1 Create directory structure: app/, app/scoring/, app/api/, frontend/, frontend/js, frontend/css, tests/, scripts/  
+- [x] 1.1 Create directory structure: app/, app/scoring/, app/api/, frontend/, frontend/js, frontend/css, tests/, scripts/  
   > Done when: Folders exist in repo
-- [ ] 1.2 requirements.txt: fastapi, uvicorn, sqlalchemy, pydantic, python-multipart, pytest, httpx, alembic  
+- [x] 1.2 requirements.txt: fastapi, uvicorn, sqlalchemy, pydantic, python-multipart, pytest, httpx, alembic  
   > Done when: pip install -r requirements.txt succeeds
-- [ ] 1.3 .env.example: DATABASE_URL=sqlite:///./cric_scorer.db, SECRET_KEY=dev-change-me, WS_PING_INTERVAL=20  
+- [x] 1.3 .env.example: DATABASE_URL=sqlite:///./cric_scorer.db, SECRET_KEY=dev-change-me, WS_PING_INTERVAL=20  
   > Done when: File present
-- [ ] 1.4 scripts/run_local.py: init DB tables, start uvicorn app.main:app --reload --port 8000  
+- [x] 1.4 scripts/run_local.py: init DB tables, start uvicorn app.main:app --reload --port 8000  
   > Done when: python scripts/run_local.py starts server
-- [ ] 1.5 GET /health returning {"status":"ok"}  
+- [x] 1.5 GET /health returning {"status":"ok"}  
   > Done when: curl localhost:8000/health -> 200
 
 ---
