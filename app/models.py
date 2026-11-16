@@ -264,13 +264,14 @@ class PlayingXIResponse(BaseModel):
 
 
 class TossResponse(BaseModel):
-    """Response for toss records."""
+    """Response for toss records. Two-phase: call + flip."""
 
     id: int
     match_id: int
-    toss_winner_team_id: Optional[int]
-    toss_decision: Optional[str]
-    coin_result: Optional[str]
+    initiator_call: Optional[str]  # heads or tails called
+    coin_result: Optional[str]  # heads or tails actual result
+    winner_team_id: Optional[int]
+    toss_decision: Optional[str]  # bat or field chosen by winning team
     called_by_session_id: Optional[str]
     created_at: datetime
 
@@ -321,11 +322,21 @@ class XIEntry(BaseModel):
     is_wicketkeeper: bool = Field(False)
 
 
-class TossData(BaseModel):
-    """Request model for toss."""
+class TossCallData(BaseModel):
+    """Request model for initiating the toss call (Phase 1)."""
 
-    winner_team_id: int = Field(..., description="Team ID of team that won the toss")
-    toss_decision: str = Field(
-        ..., description="bat or field (chosen by winning team)"
-    )
-    coin_result: Optional[str] = Field(None, description="heads or tails")
+    call: str = Field(..., description="heads or tails (initiator call)")
+
+
+class TossFlipData(BaseModel):
+    """Request model for flipping the coin (Phase 2)."""
+
+    pass
+
+
+class TossResultData(BaseModel):
+    """Response data for toss outcome with decision."""
+
+    winner_team_id: int = Field(..., description="Team that won the toss")
+    coin_result: str = Field(..., description="heads or tails")
+    toss_decision: str = Field(..., description="bat or field chosen by winning team")

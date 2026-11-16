@@ -1,0 +1,145 @@
+/* Toss-specific styles */
+
+/* Phase 1: Call buttons */
+.toss-btn--heads {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+}
+
+.toss-btn--heads:hover {
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
+.toss-btn--tails {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+    border: none;
+}
+
+.toss-btn--tails:hover {
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+/* Disable buttons after call is made */
+.toss-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Phase 2: Result display */
+.toss-result {
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0;
+}
+
+.toss-result--heads {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    color: #155724;
+    border: 2px solid #28a745;
+}
+
+.toss-result--tails {
+    background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+    color: #0c5460;
+    border: 2px solid #17a2b8;
+}
+
+.winner {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-top: 8px;
+    color: #2c3e50;
+}
+
+/* Decision buttons */
+.decision-btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: 2px solid #3498db;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.decision-btn:active {
+    transform: scale(0.98);
+}
+
+.decision-btn:hover {
+    background: #f0f8ff;
+}
+
+/* Disable after decision */
+.decision-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Phase states */
+.toss-phase > h3 {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.toss-phase p {
+    margin: 8px 0;
+}
+
+/* Status messages */
+.status {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.status.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.toss-phase {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s;
+}
+
+.roll {
+    animation: pulse 1s ease-in-out infinite;
+}

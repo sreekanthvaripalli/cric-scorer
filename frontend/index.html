@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cric-Scorer — Match</title>
+    <link rel="stylesheet" href="css/toss.css">
+    <link rel="stylesheet" href="css/global.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Cric-Scorer</h1>
+            <a href="index.html" class="back-link">← Back to matches</a>
+        </header>
+
+        <main class="main">
+            <!-- Match Info -->
+            <section class="match-info card">
+                <h2>Match Details</h2>
+                <p id="match-name">Loading...</p>
+                <p id="match-format">Format: <span id="format-name">—</span></p>
+                <p id="match-overs">Overs: <span id="overs-per-innings">—</span></p>
+                <p id="match-status" class="status">Status: <span id="status-text">—</span></p>
+                <p id="match-teams">Teams: <span id="team-a">—</span> vs <span id="team-b">—</span></p>
+            </section>
+
+            <!-- Online Toss Section -->
+            <section class="toss-section card">
+                <h2>Online Toss (Heads / Tails)</h2>
+
+                <!-- Phase 1: Call Heads or Tails -->
+                <div id="toss-phase-1" class="toss-phase">
+                    <h3>Call the Toss</h3>
+                    <p>The <strong>initiator</strong> must call heads or tails before the coin is flipped.</p>
+                    <div class="toss-buttons">
+                        <button id="call-heads" class="toss-btn toss-btn--heads">
+                            <span class="toss-icon">🪙</span> Heads
+                        </button>
+                        <button id="call-tails" class="toss-btn toss-btn--tails">
+                            <span class="toss-icon">🪙</span> Tails
+                        </button>
+                    </div>
+                    <p id="toss-call-status" class="status"></p>
+                </div>
+
+                <!-- Phase 2: Flip Result -->
+                <div id="toss-phase-2" class="toss-phase hidden">
+                    <h3>Coin Flipped!</h3>
+                    <div id="toss-result" class="toss-result">
+                        <p id="toss-result-display"></p>
+                        <p id="toss-winner" class="winner"></p>
+                    </div>
+                    <label for="toss-decision">Choose Bat or Field:</label>
+                    <div class="decision-buttons">
+                        <button id="decision-bat" class="decision-btn">🏏 Bat</button>
+                        <button id="decision-field" class="decision-btn">🧢 Field</button>
+                    </div>
+                    <p id="toss-decision-status" class="status"></p>
+                </div>
+
+                <!-- After Decision -->
+                <div id="toss-phase-3" class="toss-phase hidden">
+                    <h3>Toss Complete!</h3>
+                    <p><strong>Winner:</strong> <span id="final-winner"></span></p>
+                    <p><strong>Decision:</strong> <span id="final-decision"></span></p>
+                    <p id="toss-final-status" class="status success">✅ Toss locked! Scoring can begin.</p>
+                </div>
+            </section>
+
+            <!-- Scorecard Preview -->
+            <section class="scorecard card">
+                <h2>Scorecard</h2>
+                <p id="scorecard-info">Waiting for scoring to begin...</p>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Cric-Scorer &copy; 2026 — Offline-first cricket scorer</p>
+        </footer>
+    </div>
+
+    <script src="js/toss.js"></script>
+</body>
+</html>

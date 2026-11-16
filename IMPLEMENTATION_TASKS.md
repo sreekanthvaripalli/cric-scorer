@@ -90,17 +90,17 @@
 **Dependencies:** Modules 1, 2, 3
 **Deliverable:** Online toss with heads/tails, winner determined, bat/field choice locked before scoring
 
-- [ ] 12.1 Toss model: id, match_id, initiator_call (heads/tails), coin_result (heads/tails), winner_team_id, called_by_session_id, created_at
+- [x] 12.1 Toss model: id, match_id, initiator_call (heads/tails), coin_result (heads/tails), winner_team_id, called_by_session_id, created_at
   > Done when: Model + migration
-- [ ] 12.2 POST /matches/{id}/toss/call — initiator calls heads or tails before coin flip
+- [x] 12.2 POST /matches/{id}/toss/call — initiator calls heads or tails before coin flip
   > Done when: Call recorded, match status updated
-- [ ] 12.3 POST /matches/{id}/toss/flip — system randomly determines heads/tails (crypto-safe random), sets winner team based on call vs result
+- [x] 12.3 POST /matches/{id}/toss/flip — system randomly determines heads/tails (crypto-safe random), sets winner team based on call vs result
   > Done when: Result stored, winner team determined
-- [ ] 12.4 GET /matches/{id}/toss — public, returns toss call, result, winner, decision (bat/field)
+- [x] 12.4 GET /matches/{id}/toss — public, returns toss call, result, winner, decision (bat/field)
   > Done when: Anyone can view toss outcome
-- [ ] 12.5 Toss must be completed before first ball is recorded; POST /balls rejects if toss not done
+- [x] 12.5 Toss must be completed before first ball is recorded; POST /balls rejects if toss not done
   > Done when: Toss enforced before scoring
-- [ ] 12.6 UI: initiator sees "Call Heads or Tails" button; after flip, shows winner and option to choose bat/field
+- [x] 12.6 UI: initiator sees "Call Heads or Tails" button; after flip, shows winner and option to choose bat/field
   > Done when: Toss UI in PWA
 
 ---

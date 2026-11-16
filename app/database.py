@@ -206,17 +206,23 @@ class PlayingXI(Base):
 
 
 class Toss(Base):
-    """Online toss (heads/tails) before first ball."""
+    """Online toss (heads/tails) before first ball.
+
+    Two-phase:
+    1. CALL: initiator calls heads or tails
+    2. FLIP: system determines coin result, winner team derived from call vs result
+    """
 
     __tablename__ = "toss"
 
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, nullable=False)
-    toss_winner_team_id = Column(Integer, nullable=True)  # team that won the toss
+    initiator_call = Column(String(10), nullable=True)  # heads or tails called
+    coin_result = Column(String(10), nullable=True)  # heads or tails actual result
+    winner_team_id = Column(Integer, nullable=True)  # team decided by call vs result
     toss_decision = Column(
         String(10), nullable=True
-    )  # bat or field (chosen by winning team)
-    coin_result = Column(String(10), nullable=True)  # heads or tails
+    )  # bat or field chosen by winning team
     called_by_session_id = Column(
         String(36), nullable=True
     )  # session that called the toss

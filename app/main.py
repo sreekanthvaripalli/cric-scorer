@@ -13,7 +13,7 @@ from .models import (
     BallRecordResponse, ConfirmScoresRequest, LockMatchRequest, MvpAwardRequest,
     TeamResponse, PlayerResponse, MatchTeamLinkResponse, MatchSquadResponse,
     PlayingXIResponse, TossResponse, FormatConfigResponse, TeamData,
-    Player as PlayerRequest, XIEntry, TossData,
+    Player as PlayerRequest, XIEntry, TossCallData, TossFlipData, TossResultData,
 )
 
 app = FastAPI(title="Cric-Scorer API", version="0.0.1")
@@ -198,6 +198,10 @@ def list_scoring_requests(match_id: int, db = Depends(get_db), current_session =
 
 @app.post("/matches/{match_id}/balls", response_model=None)
 def record_ball(match_id: int, ball_data: BallRecord, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """Record a delivery for the match.
+
+    Requires scoring rights and a completed online toss.
+    """
     stmt = select(Match).where(Match.id == match_id)
     result = db.execute(stmt)
     match = result.scalar_one_or_none()
@@ -215,7 +219,16 @@ def record_ball(match_id: int, ball_data: BallRecord, db = Depends(get_db), curr
     else:
         has_rights = False
     if not has_rights:
-        raise HTTPException(status_code=403, detail="Scoring rights required to record deliveries. Request approval from the initiator.")
+        raise HTTPException(status_code=403, detail="Scoring rights required to record deliveries. Request approval from the initiator")
+    # Module 12: Toss must be completed before first ball
+    toss = db.query(Toss).filter(Toss.match_id == match_id).first()
+    if not toss or not toss.coin_result:
+        raise HTTPException(
+            status_code=403,
+            detail="Online toss has not been completed. "
+                  "Call heads/tails first (POST /matches/{id}/toss/call), "
+                  "then flip the coin (POST /matches/{id}/toss/flip)",
+        )
     total_runs = ball_data.runs_batter + ball_data.runs_extras
     wickets = 1 if ball_data.is_wicket else 0
     overs = ball_data.over_number + (ball_data.ball_number / 6.0)
@@ -283,18 +296,6 @@ def set_playing_xi(match_id: int, xi_data: List[XIEntry], db = Depends(get_db), 
     return {"message": f"Set playing XI for {len(xi_data)} players", "match_id": match_id}
 
 
-@app.post("/matches/{match_id}/toss", status_code=201, response_model=None)
-def call_toss(match_id: int, toss_data: TossData, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
-    stmt = select(Match).where(Match.id == match_id)
-    result = db.execute(stmt)
-    match = result.scalar_one_or_none()
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-    toss = Toss(match_id=match_id, toss_winner_team_id=toss_data.winner_team_id, toss_decision=toss_data.toss_decision, coin_result=toss_data.coin_result, called_by_session_id=current_session.session_id)
-    db.add(toss)
-    db.commit()
-    db.refresh(toss)
-    return TossResponse(id=toss.id, match_id=match_id, toss_winner_team_id=toss.toss_winner_team_id, toss_decision=toss.toss_decision, coin_result=toss.coin_result, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
 
 
 @app.get("/formats", response_model=None)
@@ -315,7 +316,9 @@ def get_format(format_id: int, db = Depends(get_db)) -> dict:
     return fmt
 
 
-# ---- Module 3: Teams, players, squads & format config ----
+"""Module 3: Teams, players, squads, format config & online toss."""
+
+# ---- Module 3: Teams ----
 @app.post("/matches/{match_id}/teams", status_code=201, response_model=None)
 def create_match_teams(match_id: int, team_data: TeamData, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
     """Create/edit two teams for the match."""
@@ -338,15 +341,94 @@ def create_match_teams(match_id: int, team_data: TeamData, db = Depends(get_db),
     db.add(link_b)
     db.commit()
     return MatchTeamLinkResponse(id=link_a.id, match_id=match_id, team_id=team_a.id, team_role="team_a", team_name=team_a.name, short_name=team_a.short_name, is_home=True, created_at=link_a.created_at)
+
+
+# ---- Module 12: Online Toss (Heads / Tails) ----
+@app.post("/matches/{match_id}/toss/call", status_code=201, response_model=None)
+def call_toss(match_id: int, toss_call: TossCallData, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """Initiator calls heads or tails before the coin flip (Phase 1)."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
     if match.initiator_session_id != current_session.session_id:
-        raise HTTPException(status_code=403, detail="Only the match initiator can reject scoring requests")
-    stmt_role = select(MatchRole).where(MatchRole.match_id == match_id, MatchRole.id == request_id, MatchRole.role == "requester")
-    result = db.execute(stmt_role)
-    role = result.scalar_one_or_none()
-    if not role:
-        raise HTTPException(status_code=404, detail="No pending scoring request found with that ID")
-    db.delete(role)
+        raise HTTPException(status_code=403, detail="Only the match initiator can call the toss")
+    existing = db.query(Toss).filter(Toss.match_id == match_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Toss has already been initiated for this match")
+    toss = Toss(match_id=match_id, initiator_call=toss_call.call, called_by_session_id=current_session.session_id)
+    db.add(toss)
     db.commit()
-    return {"message": "Scoring request rejected and removed", "request_id": request_id}
+    db.refresh(toss)
+    return TossResponse(id=toss.id, match_id=match_id, initiator_call=toss.initiator_call, coin_result=None, winner_team_id=None, toss_decision=None, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
+
+
+@app.post("/matches/{match_id}/toss/flip", status_code=201, response_model=None)
+def flip_coin(match_id: int, toss_flip: TossFlipData, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """System randomly determines heads/tails and sets winner team."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    toss = db.query(Toss).filter(Toss.match_id == match_id).first()
+    if not toss:
+        raise HTTPException(status_code=400, detail="Toss call must be made before flipping the coin")
+    import secrets
+    call = toss.initiator_call.lower()
+    coin_result = secrets.choice(["heads", "tails"])
+    is_match = (call == coin_result)
+    winner_team_id = 1 if is_match else 2
+    toss.coin_result = coin_result
+    toss.winner_team_id = winner_team_id
+    db.commit()
+    db.refresh(toss)
+    return TossResponse(id=toss.id, match_id=match_id, initiator_call=toss.initiator_call, coin_result=toss.coin_result, winner_team_id=toss.winner_team_id, toss_decision=toss.toss_decision, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
+
+
+@app.get("/matches/{match_id}/toss", response_model=None)
+def get_toss(match_id: int, db = Depends(get_db)) -> dict:
+    """Public endpoint to view the online toss outcome."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    toss = db.query(Toss).filter(Toss.match_id == match_id).first()
+    if not toss:
+        return {
+            "match_id": match_id,
+            "status": "pending",
+            "initiator_call": None,
+            "coin_result": None,
+            "winner_team_id": None,
+            "toss_decision": None,
+            "called_by_session_id": None,
+        }
+    return TossResponse(id=toss.id, match_id=match_id, initiator_call=toss.initiator_call, coin_result=toss.coin_result, winner_team_id=toss.winner_team_id, toss_decision=toss.toss_decision, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
+
+@app.post("/matches/{match_id}/toss/flip/result", status_code=201, response_model=None)
+def record_toss_decision(match_id: int, toss_result: TossResultData, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """Record the winning team's decision (bat or field)."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    toss = db.query(Toss).filter(Toss.match_id == match_id).first()
+    if not toss:
+        raise HTTPException(status_code=400, detail="No toss found for this match")
+    if not toss.coin_result:
+        raise HTTPException(status_code=400, detail="Toss must be flipped before recording decision")
+    decision = toss_result.toss_decision.lower()
+    if decision not in ['bat', 'field']:
+        raise HTTPException(status_code=400, detail='toss_decision must be "bat" or "field"')
+    toss.toss_decision = decision
+    db.commit()
+    db.refresh(toss)
+    if match.status == 'created':
+        match.status = 'toss_complete'
+        match.updated_at = datetime.now(timezone.utc)
+        db.commit()
+    return TossResponse(id=toss.id, match_id=match_id, initiator_call=toss.initiator_call, coin_result=toss.coin_result, winner_team_id=toss.winner_team_id, toss_decision=toss.toss_decision, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
