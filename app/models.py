@@ -202,3 +202,130 @@ class MvpAwardRequest(BaseModel):
     points: int = Field(..., ge=0, description="Points awarded")
     reason_summary: str = Field(..., max_length=500, description="Reason for MVP award")
     awarded_by_session_id: str
+
+
+# --- Module 3 Response Models ---
+
+
+class TeamResponse(BaseModel):
+    """Response for team data."""
+
+    id: int
+    name: str
+    short_name: Optional[str]
+    created_at: datetime
+
+
+class PlayerResponse(BaseModel):
+    """Response for player data."""
+
+    id: int
+    team_id: int
+    name: str
+    role: str
+    jersey_number: Optional[int]
+    created_at: datetime
+
+
+class MatchTeamLinkResponse(BaseModel):
+    """Response for match-team link."""
+
+    id: int
+    match_id: int
+    team_id: int
+    team_role: str
+    team_name: str
+    short_name: Optional[str]
+    is_home: bool
+    created_at: datetime
+
+
+class MatchSquadResponse(BaseModel):
+    """Response for match squad."""
+
+    id: int
+    match_id: int
+    player_id: int
+    team_id: int
+    is_substitute: bool
+    created_at: datetime
+
+
+class PlayingXIResponse(BaseModel):
+    """Response for playing XI entries."""
+
+    id: int
+    match_id: int
+    player_id: int
+    team_id: int
+    is_captain: bool
+    is_wicketkeeper: bool
+    created_at: datetime
+
+
+class TossResponse(BaseModel):
+    """Response for toss records."""
+
+    id: int
+    match_id: int
+    toss_winner_team_id: Optional[int]
+    toss_decision: Optional[str]
+    coin_result: Optional[str]
+    called_by_session_id: Optional[str]
+    created_at: datetime
+
+
+class FormatConfigResponse(BaseModel):
+    """Response for format configuration."""
+
+    id: int
+    format_name: str
+    overs_per_innings: int
+    balls_per_over: int
+    max_overs_per_bowler: int
+    free_hit_after_no_ball: bool
+    powerplay_max_overs: Optional[int]
+    new_ball_every_overs: Optional[int]
+    follow_on_threshold: Optional[int]
+    created_at: datetime
+
+
+# --- Module 3 Request Models ---
+
+
+class TeamData(BaseModel):
+    """Request model for team creation."""
+
+    team_a_name: str = Field(..., max_length=150)
+    team_a_short: Optional[str] = Field(None, max_length=50, description="Team A short name")
+    team_b_name: str = Field(..., max_length=150)
+    team_b_short: Optional[str] = Field(None, max_length=50, description="Team B short name")
+
+
+class Player(BaseModel):
+    """Request model for player data."""
+
+    team_id: int
+    name: str
+    role: str = Field("all-rounder", description="batter / bowler / all-rounder / wicketkeeper")
+    jersey_number: Optional[int] = Field(None, description="1-11 for the XI")
+    is_substitute: bool = Field(False, description="Whether player is a substitute")
+
+
+class XIEntry(BaseModel):
+    """Entry in playing XI selection."""
+
+    player_id: int
+    team_id: int
+    is_captain: bool = Field(False)
+    is_wicketkeeper: bool = Field(False)
+
+
+class TossData(BaseModel):
+    """Request model for toss."""
+
+    winner_team_id: int = Field(..., description="Team ID of team that won the toss")
+    toss_decision: str = Field(
+        ..., description="bat or field (chosen by winning team)"
+    )
+    coin_result: Optional[str] = Field(None, description="heads or tails")

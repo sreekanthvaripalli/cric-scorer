@@ -111,6 +111,141 @@ class MatchRole(Base):
         DateTime(timezone=True), nullable=True
     )  # when approval happened
     created_at = Column(
+        DateTime(timezone=True), nullable=False
+    )  # when approval happened
+
+# Module 3: Teams, players, squads & format config
+class Team(Base):
+    """Team model for cricket teams in a match."""
+
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)  # team name
+    short_name = Column(String(50), nullable=True)  # e.g. "CC" for Cricket Club
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class Player(Base):
+    """Player model for individuals in a team squad."""
+
+    __tablename__ = "players"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, nullable=False)  # foreign key to teams.id
+    name = Column(String(150), nullable=False)  # player name
+    role = Column(
+        String(20),
+        nullable=False,
+        default="all-rounder",  # batter / bowler / all-rounder / wicketkeeper
+    )
+    jersey_number = Column(Integer, nullable=True)  # 1-11 for the XI
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class MatchTeamLink(Base):
+    """Link a team to a match."""
+
+    __tablename__ = "match_team_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False)
+    team_id = Column(Integer, nullable=False)
+    team_role = Column(
+        String(10), nullable=False, default="team_a"  # team_a or team_b
+    )
+    is_home = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class MatchSquad(Base):
+    """Player squad for a match (up to 12 players per team, 11 + sub)."""
+
+    __tablename__ = "match_squads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False)
+    player_id = Column(Integer, nullable=False)
+    team_id = Column(Integer, nullable=False)  # which team this player belongs to
+    is_substitute = Column(Boolean, nullable=False, default=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class PlayingXI(Base):
+    """Selected playing XI for a match."""
+
+    __tablename__ = "playing_xi"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False)
+    player_id = Column(Integer, nullable=False)
+    team_id = Column(Integer, nullable=False)
+    is_captain = Column(Boolean, nullable=False, default=False)
+    is_wicketkeeper = Column(Boolean, nullable=False, default=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class Toss(Base):
+    """Online toss (heads/tails) before first ball."""
+
+    __tablename__ = "toss"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False)
+    toss_winner_team_id = Column(Integer, nullable=True)  # team that won the toss
+    toss_decision = Column(
+        String(10), nullable=True
+    )  # bat or field (chosen by winning team)
+    coin_result = Column(String(10), nullable=True)  # heads or tails
+    called_by_session_id = Column(
+        String(36), nullable=True
+    )  # session that called the toss
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class FormatConfig(Base):
+    """Format configuration (T20, ODI, Test, Custom)."""
+
+    __tablename__ = "format_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    format_name = Column(String(20), nullable=False, unique=True)  # T20, ODI, Test, Custom
+    overs_per_innings = Column(Integer, nullable=False, default=20)
+    balls_per_over = Column(Integer, nullable=False, default=6)
+    max_overs_per_bowler = Column(Integer, nullable=False, default=4)  # T20: 4, ODI: 10, Test: unlimited
+    free_hit_after_no_ball = Column(Boolean, nullable=False, default=True)  # T20: yes, ODI: yes, Test: yes
+    powerplay_max_overs = Column(Integer, nullable=True)  # T20: 6 overs, ODI: 30 overs, Test: N/A
+    new_ball_every_overs = Column(
+        Integer, nullable=True
+    )  # Test: 80 overs
+    follow_on_threshold = Column(
+        Integer, nullable=True
+    )  # Test: 200
+    created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,

@@ -68,19 +68,19 @@
 **Dependencies:** Module 2
 **Deliverable:** Teams, players, XI, toss, format config
 
-- [ ] 3.1 Team model: id, match_id, name, short_name
+- [x] 3.1 Team model: id, match_id, name, short_name
   > Done when: Model + migration
-- [ ] 3.2 Player model: id, team_id, name, role (batter/bowler/all-rounder/wicketkeeper), jersey_number
+- [x] 3.2 Player model: id, team_id, name, role (batter/bowler/all-rounder/wicketkeeper), jersey_number
   > Done when: Model + migration
-- [ ] 3.3 POST /matches/{id}/teams — create/edit two teams for the match
+- [x] 3.3 POST /matches/{id}/teams — create/edit two teams for the match
   > Done when: Two teams linked to match
-- [ ] 3.4 POST /matches/{id}/squad — add players to a team's squad (11 + substitutes)
+- [x] 3.4 POST /matches/{id}/squad — add players to a team's squad (11 + substitutes)
   > Done when: Squad stored
-- [ ] 3.5 POST /matches/{id}/playing-xi — select Playing XI per innings from squad, mark captain & wicketkeeper
+- [x] 3.5 POST /matches/{id}/playing-xi — select Playing XI per innings from squad, mark captain & wicketkeeper
   > Done when: XI stored
-- [ ] 3.6 POST /matches/{id}/toss — record toss_winner_team_id, toss_decision (bat/field); must happen before first ball
+- [x] 3.6 POST /matches/{id}/toss — record toss_winner_team_id, toss_decision (bat/field); must happen before first ball
   > Done when: Toss locked before innings start
-- [ ] 3.7 Format presets: T20 (20 overs, max 4 overs/bowler, free hit after NB), ODI (50 overs), Test (unlimited, new ball 80 overs, follow-on). Custom: initiator sets overs_per_innings freely; max overs per bowler calculated as overs_per_innings / 5 (rounded down) unless initiator specifies otherwise.
+- [x] 3.7 Format presets: T20 (20 overs, max 4 overs/bowler, free hit after NB), ODI (50 overs), Test (unlimited, new ball 80 overs, follow-on). Custom: initiator sets overs_per_innings freely; max overs per bowler calculated as overs_per_innings / 5 (rounded down) unless initiator specifies otherwise.
   > Done when: Config applied by format, custom overs validated
 
 ---
