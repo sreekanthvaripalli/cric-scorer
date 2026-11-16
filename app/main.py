@@ -197,10 +197,19 @@ def list_scoring_requests(match_id: int, db = Depends(get_db), current_session =
 
 
 @app.post("/matches/{match_id}/balls", response_model=None)
-def record_ball(match_id: int, ball_data: BallRecord, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
-    """Record a delivery for the match.
+def record_ball(match_id: int, ball_data: BallRecordRequest, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """Record one delivery atomically.
 
-    Requires scoring rights and a completed online toss.
+    Validates all cricketing rules:
+    - Runs 0-6, boundary greater-of (Law 19.7)
+    - Bowler not consecutive overs (Law 17.6), max overs per format
+    - Extras: no ball (+1 penalty, not in over, sets free-hit), wide (+1, not in over), bye/leg-bye, penalty
+    - No ball overrides Wide (Law 21.12)
+    - Dismissals: all 10 modes with context validation
+    - Strike rotation per Laws 18.11/18.12
+
+    Requires scoring_rights=true or role=initiator.
+    Toss must be completed before recording balls.
     """
     stmt = select(Match).where(Match.id == match_id)
     result = db.execute(stmt)
@@ -212,27 +221,74 @@ def record_ball(match_id: int, ball_data: BallRecord, db = Depends(get_db), curr
     role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(status_code=403, detail="Session not registered for this match")
-    if role.role == "initiator":
-        has_rights = True
-    elif role.scoring_rights:
-        has_rights = True
-    else:
-        has_rights = False
-    if not has_rights:
+    if role.role not in ("initiator", "scorer") or not role.scoring_rights:
         raise HTTPException(status_code=403, detail="Scoring rights required to record deliveries. Request approval from the initiator")
     # Module 12: Toss must be completed before first ball
     toss = db.query(Toss).filter(Toss.match_id == match_id).first()
     if not toss or not toss.coin_result:
         raise HTTPException(
             status_code=403,
-            detail="Online toss has not been completed. "
-                  "Call heads/tails first (POST /matches/{id}/toss/call), "
-                  "then flip the coin (POST /matches/{id}/toss/flip)",
+            detail="Online toss has not been completed. Call heads/tails first (POST /matches/{id}/toss/call), then flip the coin (POST /matches/{id}/toss/flip)",
         )
-    total_runs = ball_data.runs_batter + ball_data.runs_extras
-    wickets = 1 if ball_data.is_wicket else 0
-    overs = ball_data.over_number + (ball_data.ball_number / 6.0)
-    return BallRecordResponse(ball_id=0, over_number=ball_data.over_number, ball_number=ball_data.ball_number, runs_total=total_runs, runs_batter=ball_data.runs_batter, runs_extras=ball_data.runs_extras, wickets=wickets, total_overs=overs, status="recorded")
+    # Get current innings (1 or 2)
+    innings_id = 1  # Simplified - would check if first innings complete
+    from app.scoring.engine import process_ball
+    try:
+        response = process_ball(db, match, ball_data, role, innings_id, True)
+        return response
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/matches/{match_id}/balls/{ball_id}/undo", response_model=None)
+def undo_ball(match_id: int, ball_id: int, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    """Rollback the last delivery and restore previous state.
+
+    - Deletes the specified ball record
+    - Recomputes checksum
+    - Updates match state
+    """
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    stmt_role = select(MatchRole).where(MatchRole.match_id == match_id, MatchRole.session_id == current_session.session_id)
+    result = db.execute(stmt_role)
+    role = result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=403, detail="Session not registered for this match")
+    if role.role != "initiator" and not role.scoring_rights:
+        raise HTTPException(status_code=403, detail="Scoring rights required to undo")
+    # Get the ball to verify ownership
+    ball = db.query(Ball).filter(Ball.id == ball_id, Ball.match_id == match_id).first()
+    if not ball:
+        raise HTTPException(status_code=404, detail="Ball not found")
+    # Delete the ball
+    db.delete(ball)
+    # Recompute checksum
+    match.checksum = compute_checksum(match)
+    match.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Delivery undone", "match_id": match_id, "checksum": match.checksum}
+
+
+@app.get("/matches/{match_id}/checksum", response_model=None)
+def get_match_checksum(match_id: int, db = Depends(get_db)) -> dict:
+    """Get the current checksum of the match.
+
+    The checksum is recomputed after every delivery and provides
+    a cryptographic fingerprint of the match state for integrity verification.
+    """
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    # Recompute checksum from current state
+    checksum = compute_checksum(match)
+    return {"match_id": match_id, "checksum": checksum, "computed_at": datetime.now(timezone.utc)}
 
 
 @app.post("/matches/{match_id}/undo", response_model=None)

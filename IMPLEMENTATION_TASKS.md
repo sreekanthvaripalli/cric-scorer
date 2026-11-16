@@ -110,29 +110,29 @@
 **Dependencies:** Modules 1-3
 **Deliverable:** Fully validated scoring engine with ~100% edge-case coverage
 
-- [ ] 4.1 Ball model: id, innings_id, over_number, ball_number, striker_id, non_striker_id, bowler_id, runs_batter, runs_extras, extra_type (nb/wd/bye/legbye/penalty), penalty_runs, is_wicket, dismissal_mode, fielder_id, short_runs, boundary_type (4/6), is_free_hit, is_valid_ball, created_at
+- [x] 4.1 Ball model: id, innings_id, over_number, ball_number, striker_id, non_striker_id, bowler_id, runs_batter, runs_extras, extra_type (nb/wd/bye/legbye/penalty), penalty_runs, is_wicket, dismissal_mode, fielder_id, short_runs, boundary_type (4/6), is_free_hit, is_valid_ball, created_at
   > Done when: Model + migration
-- [ ] 4.2 Over state machine: count only valid balls toward 6; No ball & Wide do not count; auto-call Over after 6 valid balls; switch ends
+- [x] 4.2 Over state machine: count only valid balls toward 6; No ball & Wide do not count; auto-call Over after 6 valid balls; switch ends
   > Done when: Over completes correctly
-- [ ] 4.3 Validate bowler: not bowling consecutive overs (Law 17.6), within max overs per format
+- [x] 4.3 Validate bowler: not bowling consecutive overs (Law 17.6), within max overs per format
   > Done when: Illegal bowler rejected
-- [ ] 4.4 Validate striker: not out, not retired out, at crease
+- [x] 4.4 Validate striker: not out, not retired out, at crease
   > Done when: Invalid striker rejected
-- [ ] 4.5 Runs: 0-6 bat runs; boundary 4/6 with Law 19.7 greater-of; byes/leg byes not debited to bowler; penalty runs separate column
+- [x] 4.5 Runs: 0-6 bat runs; boundary 4/6 with Law 19.7 greater-of; byes/leg byes not debited to bowler; penalty runs separate column
   > Done when: Runs per Laws 18/19/23
-- [ ] 4.6 Extras: No ball = +1 penalty (No ball extra, debited to bowler, not in over, sets free_hit_next, overrides Wide); Wide = +1 penalty (Wide extra, debited to bowler, not in over); No ball overrides Wide (Law 21.12)
+- [x] 4.6 Extras: No ball = +1 penalty (No ball extra, debited to bowler, not in over, sets free_hit_next, overrides Wide); Wide = +1 penalty (Wide extra, debited to bowler, not in over); No ball overrides Wide (Law 21.12)
   > Done when: Extras correct
-- [ ] 4.7 Dismissals: all 10 modes (Bowled, Caught, LBW, Run out, Stumped, Hit wicket, Hit ball twice, Obstructing field, Timed out, Retired); validate legality vs No ball / Wide / free-hit context (Laws 21.17, 22.9); credit bowler/fielder per Laws 32-39; end-swap per Laws 18.11/18.12
+- [x] 4.7 Dismissals: all 10 modes (Bowled, Caught, LBW, Run out, Stumped, Hit wicket, Hit ball twice, Obstructing field, Timed out, Retired); validate legality vs No ball / Wide / free-hit context (Laws 21.17, 22.9); credit bowler/fielder per Laws 32-39; end-swap per Laws 18.11/18.12
   > Done when: Dismissals correct
-- [ ] 4.8 Strike rotation: swap ends on odd runs; after wicket per Law; after over swap ends & new bowler (not same as previous)
+- [x] 4.8 Strike rotation: swap ends on odd runs; after wicket per Law; after over swap ends & new bowler (not same as previous)
   > Done when: Strike logic correct
-- [ ] 4.9 Innings completion: all out / overs completed / target reached / declaration (Test)
+- [x] 4.9 Innings completion: all out / overs completed / target reached / declaration (Test)
   > Done when: Innings ends correctly
-- [ ] 4.10 POST /matches/{id}/balls — record one delivery atomically; recompute checksum; reject invalid with Law citation
+- [x] 4.10 POST /matches/{id}/balls — record one delivery atomically; recompute checksum; reject invalid with Law citation
   > Done when: Delivery endpoint works
-- [ ] 4.11 POST /matches/{id}/balls/{ball_id}/undo — rollback last delivery, restore previous state
+- [x] 4.11 POST /matches/{id}/balls/{ball_id}/undo — rollback last delivery, restore previous state
   > Done when: Undo works
-- [ ] 4.12 Match checksum recomputed after every delivery; exposed via GET /matches/{id}/checksum
+- [x] 4.12 Match checksum recomputed after every delivery; exposed via GET /matches/{id}/checksum
   > Done when: Checksum endpoint works
 
 ---

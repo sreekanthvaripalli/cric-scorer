@@ -256,3 +256,43 @@ class FormatConfig(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+class Ball(Base):
+    """Individual delivery record in a match."""
+
+    __tablename__ = "balls"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False)
+    innings_id = Column(Integer, nullable=False)  # ball belongs to a specific innings
+    over_number = Column(Integer, nullable=False)  # current over number
+    ball_number = Column(Integer, nullable=False)  # 1-6 within the over
+    striker_id = Column(Integer, nullable=False)  # player_id of striker
+    non_striker_id = Column(Integer, nullable=False)  # player_id of non-striker
+    bowler_id = Column(Integer, nullable=False)  # player_id of bowler
+    runs_batter = Column(Integer, nullable=False, default=0)  # runs scored by batter
+    runs_extras = Column(Integer, nullable=False, default=0)  # wides, no-balls, byes, leg-byes, penalties
+    extra_type = Column(
+        String(10), nullable=True
+    )  # nb / wd / bye / legbye / penalty / None (valid ball)
+    penalty_runs = Column(
+        Integer, nullable=False, default=0
+    )  # separate from runs_extras for accounting
+    is_wicket = Column(Boolean, nullable=False, default=False)
+    dismissal_mode = Column(
+        String(20), nullable=True
+    )  # bowled / caught / lbw / run_out / stumped / etc.
+    fielder_id = Column(Integer, nullable=True)  # player_id who took the catch / runout
+    short_runs = Column(Integer, nullable=False, default=0)  # short run penalty (leg-bye style)
+    boundary_type = Column(
+        String(2), nullable=True
+    )  # 4 / 6 / None
+    is_free_hit = Column(Boolean, nullable=False, default=False)  # free hit after no ball
+    is_valid_ball = Column(Boolean, nullable=False, default=True)  # is this a valid ball toward over count
+    is_over_completed = Column(Boolean, nullable=False, default=False)  # marks end of an over
+    is_shot_out = Column(Boolean, nullable=False, default=False)  # whether batter got out on this ball
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )

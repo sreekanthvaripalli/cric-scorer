@@ -340,3 +340,62 @@ class TossResultData(BaseModel):
     winner_team_id: int = Field(..., description="Team that won the toss")
     coin_result: str = Field(..., description="heads or tails")
     toss_decision: str = Field(..., description="bat or field chosen by winning team")
+
+
+class BallRecordRequest(BaseModel):
+    """Request model for recording a delivery."""
+    bowler_id: int = Field(..., description="Player ID of the bowler")
+    striker_id: int = Field(..., description="Player ID of the striker")
+    non_striker_id: int = Field(..., description="Player ID of the non-striker")
+    runs_batter: int = Field(0, ge=0, le=6, description="Runs scored by batter (0-6)")
+    runs_extras: int = Field(0, ge=0, description="Extras scored")
+    extra_type: Optional[str] = Field(None, description="nb / wd / bye / legbye / penalty")
+    penalty_runs: int = Field(0, ge=0, description="Penalty runs (separate from extras)")
+    is_wicket: bool = Field(False, description="Whether a wicket fell")
+    dismissal_mode: Optional[str] = Field(None, description="Bowled / caught / lbw / run_out / stumped / etc.")
+    fielder_id: Optional[int] = Field(None, description="Player ID of the fielder")
+    short_runs: int = Field(0, ge=0, description="Short run penalty (leg-bye style)")
+    boundary_type: Optional[str] = Field(None, description="4 / 6 / None")
+    is_free_hit: bool = Field(False, description="Free hit after no ball")
+
+
+class BallRecordResponse(BaseModel):
+    """Response model for a recorded delivery."""
+    ball_id: int
+    match_id: int
+    innings_id: int
+    over_number: int
+    ball_number: int
+    bowler_id: int
+    striker_id: int
+    non_striker_id: int
+    runs_batter: int
+    runs_extras: int
+    extra_type: Optional[str]
+    penalty_runs: int
+    is_wicket: bool
+    dismissal_mode: Optional[str]
+    fielder_id: Optional[int]
+    short_runs: int
+    boundary_type: Optional[str]
+    is_free_hit: bool
+    is_valid_ball: bool
+    is_over_completed: bool
+    is_shot_out: bool
+    created_at: datetime
+
+
+class BallsResponse(BaseModel):
+    """Response containing the ball record and updated match state."""
+    ball: BallRecordResponse
+    current_score: str  # e.g. "15/2"
+    current_overs: float  # e.g. 15.3
+    wickets: int
+    current_innings: int  # 1 or 2
+    over_number: int
+    ball_number: int
+    striker: int  # player_id
+    non_striker: int  # player_id
+    bowler: int  # player_id
+    match_id: int
+    checksum: str
