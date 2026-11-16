@@ -34,31 +34,31 @@
 **Dependencies:** Module 1
 **Deliverable:** Anonymous match creation, request/approve/reject scoring rights, authorised scoring enforcement (no registration)
 
-- [ ] 2.1 AnonymousSession model: id, session_id (UUID), device_name (optional nickname), created_at, last_seen_at
+- [x] 2.1 AnonymousSession model: id, session_id (UUID), device_name (optional nickname), created_at, last_seen_at
   > Done when: SQLAlchemy model + migration; no passwords, no usernames
-- [ ] 2.2 Match model: id, name, venue, date, format (T20/ODI/Test/Custom), overs_per_innings (initiator decides, not limited to standard formats), balls_per_over, status (created/in_progress/completed/locked), initiator_session_id, checksum, created_at, updated_at, locked_at, team_a_name, team_b_name
+- [x] 2.2 Match model: id, name, venue, date, format (T20/ODI/Test/Custom), overs_per_innings (initiator decides, not limited to standard formats), balls_per_over, status (created/in_progress/completed/locked), initiator_session_id, checksum, created_at, updated_at, locked_at, team_a_name, team_b_name
   > Done when: Model + migration with custom overs_per_innings field
-- [ ] 2.3 MatchRole model: match_id, session_id, role (initiator/scorer/watcher), scoring_rights (bool), approved_by_session_id, approved_at, created_at
+- [x] 2.3 MatchRole model: match_id, session_id, role (initiator/scorer/watcher), scoring_rights (bool), approved_by_session_id, approved_at, created_at
   > Done when: Model + migration
-- [ ] 2.4 POST /matches — no authentication required. Any device creates match with team_a_name, team_b_name, format, overs_per_innings, auto-assigned role=initiator, scoring_rights=true for the creating session
+- [x] 2.4 POST /matches — no authentication required. Any device creates match with team_a_name, team_b_name, format, overs_per_innings, auto-assigned role=initiator, scoring_rights=true for the creating session
   > Done when: Match created anonymously with initiator rights and both team names stored
-- [ ] 2.5 GET /matches/{id}/public — public, no auth. Returns teams, current score, overs, wickets, status, match_id, overs_per_innings
+- [x] 2.5 GET /matches/{id}/public — public, no auth. Returns teams, current score, overs, wickets, status, match_id, overs_per_innings
   > Done when: Anyone with match ID can view summary including custom overs
-- [ ] 2.6 POST /matches/{id}/request-scoring — anonymous session requests scoring rights; creates a pending request row with requestor session_id, optional device_name, request timestamp
+- [x] 2.6 POST /matches/{id}/request-scoring — anonymous session requests scoring rights; creates a pending request row with requestor session_id, optional device_name, request timestamp
   > Done when: Request recorded with session identity
-- [ ] 2.7 GET /matches/{id}/scoring-requests — initiator only; lists pending requests with requestor info (session_id, device_name, request timestamp)
+- [x] 2.7 GET /matches/{id}/scoring-requests — initiator only; lists pending requests with requestor info (session_id, device_name, request timestamp)
   > Done when: Initiator can see who is requesting and when
-- [ ] 2.8 POST /matches/{id}/scoring-requests/{request_id}/approve — initiator only; grant scoring_rights=true, role=scorer, set approved_by_session_id/approved_at
+- [x] 2.8 POST /matches/{id}/scoring-requests/{request_id}/approve — initiator only; grant scoring_rights=true, role=scorer, set approved_by_session_id/approved_at
   > Done when: Requestor session can now score
-- [ ] 2.9 POST /matches/{id}/scoring-requests/{request_id}/reject — initiator only; delete pending request
+- [x] 2.9 POST /matches/{id}/scoring-requests/{request_id}/reject — initiator only; delete pending request
   > Done when: Request removed
-- [ ] 2.10 POST /matches/{id}/scoring-rights/revoke — initiator only; revoke a scorer's rights (not allowed if match locked)
+- [x] 2.10 POST /matches/{id}/scoring-rights/revoke — initiator only; revoke a scorer's rights (not allowed if match locked)
   > Done when: Rights revoked
-- [ ] 2.11 POST /matches/{id}/transfer-ownership — initiator only; assign initiator role to another approved session
+- [x] 2.11 POST /matches/{id}/transfer-ownership — initiator only; assign initiator role to another approved session
   > Done when: New session owns match
-- [ ] 2.12 Middleware: POST /balls, POST /undo, match settings require scoring_rights=true or role=initiator, verified by session cookie/device token
+- [x] 2.12 Middleware: POST /balls, POST /undo, match settings require scoring_rights=true or role=initiator, verified by session cookie/device token
   > Done when: Unauthorised scoring returns 403
-- [ ] 2.13 Custom overs validation: validate overs_per_innings is positive integer, balls_per_over is 6 (default) or configurable, enforce max overs per bowler derived from custom overs (e.g., custom overs / 5 rounded down for T20-style, or initiator-specified)
+- [x] 2.13 Custom overs validation: validate overs_per_innings is positive integer, balls_per_over is 6 (default) or configurable, enforce max overs per bowler derived from custom overs (e.g., custom overs / 5 rounded down for T20-style, or initiator-specified)
   > Done when: Invalid overs rejected with clear error message
 
 ---
