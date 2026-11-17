@@ -399,3 +399,102 @@ class BallsResponse(BaseModel):
     bowler: int  # player_id
     match_id: int
     checksum: str
+
+
+# ── Scorecard Models ──
+
+
+class BattingScorecardEntry(BaseModel):
+    player_id: int
+    name: str
+    runs: int
+    balls: int
+    fours: int
+    sixes: int
+    strike_rate: float
+    dismissal: Optional[str]
+    dismissal_mode: Optional[str]
+    bowler_fielder_id: Optional[int]
+
+
+class BowlingAnalysisEntry(BaseModel):
+    player_id: int
+    name: str
+    overs: str  # cricket notation e.g. "10.3"
+    maidens: int
+    runs: int
+    wickets: int
+    wides: int
+    no_balls: int
+    economy: float
+
+
+class ExtrasSummary(BaseModel):
+    no_balls: int
+    wides: int
+    byes: int
+    leg_byes: int
+    penalties: int
+    total_extras: int
+
+
+class FallOfWicketEntry(BaseModel):
+    wicket: int
+    batter_out: str
+    batter_out_id: int
+    not_out_batter: str
+    not_out_batter_id: int
+    runs_at_fall: int
+    over: str
+    partnership: int
+
+
+class InningsScorecard(BaseModel):
+    innings_id: int
+    batting: List[BattingScorecardEntry]
+    bowling: List[BowlingAnalysisEntry]
+    extras: ExtrasSummary
+    fall_of_wickets: List[FallOfWicketEntry]
+
+
+class MatchScorecard(BaseModel):
+    match_id: int
+    innings: List[InningsScorecard]
+
+
+class MatchResult(BaseModel):
+    result_type: str  # win_by_runs / win_by_wickets / tie / no_result / no_match
+    winner_team_id: Optional[int]
+    margin_runs: int
+    margin_wickets: int
+    margin_text: str
+    details: dict
+
+
+class FollowOnStatus(BaseModel):
+    follow_on_possible: bool
+    threshold: int
+    team_a_runs: int
+    team_b_runs: int
+    lead: int
+    should_offer: bool
+    message: str
+
+
+class SuperOverStatus(BaseModel):
+    available: bool
+    message: str
+    team_a_score: Optional[int]
+    team_b_score: Optional[int]
+    winner_team_id: Optional[int]
+
+
+class LockMatchRequest(BaseModel):
+    confirm: bool = Field(..., description="Must be true to lock the match")
+
+
+class LockMatchResponse(BaseModel):
+    match_id: int
+    status: str
+    locked_at: Optional[datetime]
+    message: str

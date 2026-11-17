@@ -162,23 +162,23 @@
 **Dependencies:** Module 4
 **Deliverable:** Full scorecard + legally correct match result
 
-- [ ] 6.1 Batting scorecard per innings: batter, runs, balls, 4s, 6s, SR, dismissal, bowler/fielder
+- [x] 6.1 Batting scorecard per innings: batter, runs, balls, 4s, 6s, SR, dismissal, bowler/fielder
   > Done when: Scorecard renders
-- [ ] 6.2 Bowling analysis: overs (cricket notation, e.g. 10.3), maidens, runs, wickets, wides, no-balls, economy
+- [x] 6.2 Bowling analysis: overs (cricket notation, e.g. 10.3), maidens, runs, wickets, wides, no-balls, economy
   > Done when: Bowling figures correct
-- [ ] 6.3 Extras summary: no-balls, wides, byes, leg byes, penalty runs (total extras)
+- [x] 6.3 Extras summary: no-balls, wides, byes, leg byes, penalty runs (total extras)
   > Done when: Extras total matches delivery log
-- [ ] 6.4 Fall of wickets table: wicket, batter out, not out batter, runs at fall, over, partnership
+- [x] 6.4 Fall of wickets table: wicket, batter out, not out batter, runs at fall, over, partnership
   > Done when: FoW correct
-- [ ] 6.5 Result computation per Law 16: win by runs / by wickets / by Penalty runs / Tie / Draw / Conceded / Awarded
+- [x] 6.5 Result computation per Law 16: win by runs / by wickets / by Penalty runs / Tie / Draw / Conceded / Awarded
   > Done when: Result logic correct
-- [ ] 6.6 Winning-hit / extras rule (Law 16.6) for chasing side
+- [x] 6.6 Winning-hit / extras rule (Law 16.6) for chasing side
   > Done when: Boundary credit on winning hit
-- [ ] 6.7 Super Over procedure (T20 tie-breaker)
+- [x] 6.7 Super Over procedure (T20 tie-breaker)
   > Done when: Super Over flow works
-- [ ] 6.8 Follow-on enforcement (Test)
+- [x] 6.8 Follow-on enforcement (Test)
   > Done when: Follow-on offered correctly
-- [ ] 6.9 Match conclusion: Confirm correctness of scores step (Law 3.2 / 16.8) -> lock match (Law 16.10)
+- [x] 6.9 Match conclusion: Confirm correctness of scores step (Law 3.2 / 16.8) -> lock match (Law 16.10)
   > Done when: Match can be locked
 
 ---

@@ -15,6 +15,9 @@ from .models import (
     TeamResponse, PlayerResponse, MatchTeamLinkResponse, MatchSquadResponse,
     PlayingXIResponse, TossResponse, FormatConfigResponse, TeamData,
     Player as PlayerRequest, XIEntry, TossCallData, TossFlipData, TossResultData,
+    BattingScorecardEntry, BowlingAnalysisEntry, ExtrasSummary,
+    FallOfWicketEntry, InningsScorecard, MatchScorecard, MatchResult,
+    FollowOnStatus, SuperOverStatus, LockMatchResponse,
 )
 
 app = FastAPI(title="Cric-Scorer API", version="0.0.1")
@@ -601,3 +604,110 @@ async def websocket_match(websocket: WebSocket, match_id: int):
     except Exception as e:
         print(f"WebSocket error for match {match_id}: {e}")
         manager.disconnect(websocket, match_id)
+
+
+
+# ── Module 6: Scorecard, Statistics & Match Result ───────────────────────────
+
+
+@app.get("/matches/{match_id}/scorecard", response_model=None)
+def get_match_scorecard(match_id: int, db = Depends(get_db)) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    innings_list = []
+    for innings_id in (1, 2):
+        balls_count = db.query(Ball).filter(
+            Ball.match_id == match_id,
+            Ball.innings_id == innings_id,
+        ).count()
+        if balls_count > 0:
+            innings_data = compute_full_scorecard(db, match_id, innings_id)
+            innings_list.append(innings_data)
+
+    result_data = None
+    if len(innings_list) == 2:
+        result_data = compute_match_result(db, match_id)
+
+    follow_on = None
+    if match.format == "Test":
+        follow_on = compute_follow_on(db, match_id)
+
+    super_over = None
+    if match.format == "T20" and result_data and result_data["result_type"] == "tie":
+        super_over = compute_super_over(db, match_id)
+
+    return {
+        "match_id": match_id,
+        "match_name": match.name,
+        "format": match.format,
+        "status": match.status,
+        "innings": innings_list,
+        "result": result_data,
+        "follow_on": follow_on,
+        "super_over": super_over,
+    }
+
+
+@app.get("/matches/{match_id}/result", response_model=None)
+def get_match_result_endpoint(match_id: int, db = Depends(get_db)) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    result_data = compute_match_result(db, match_id)
+    return result_data
+
+
+@app.get("/matches/{match_id}/follow-on", response_model=None)
+def get_follow_on_endpoint(match_id: int, db = Depends(get_db)) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return compute_follow_on(db, match_id)
+
+
+@app.get("/matches/{match_id}/super-over", response_model=None)
+def get_super_over_endpoint(match_id: int, db = Depends(get_db)) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return compute_super_over(db, match_id)
+
+
+@app.post("/matches/{match_id}/lock", response_model=None)
+def lock_match_endpoint(
+    match_id: int,
+    lock_request: LockMatchRequest,
+    db = Depends(get_db),
+    current_session = Depends(get_current_session),
+) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.initiator_session_id != current_session.session_id:
+        raise HTTPException(status_code=403, detail="Only the match initiator can lock the match")
+    if not lock_request.confirm:
+        raise HTTPException(status_code=400, detail="Confirmation required to lock the match")
+    if match.status == "locked":
+        raise HTTPException(status_code=400, detail="Match is already locked")
+    match.status = "locked"
+    match.locked_at = datetime.now(timezone.utc)
+    match.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {
+        "match_id": match_id,
+        "status": match.status,
+        "locked_at": str(match.locked_at) if match.locked_at else None,
+        "message": "Match locked successfully",
+    }
