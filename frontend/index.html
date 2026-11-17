@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a1a2e">
+    <link rel="manifest" href="manifest.json">
     <title>Cric-Scorer — Match</title>
     <link rel="stylesheet" href="css/toss.css">
     <link rel="stylesheet" href="css/global.css">
@@ -81,5 +83,14 @@
     </div>
 
     <script src="js/toss.js"></script>
-</body>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          console.log('SW registered', reg.scope);
+        }).catch(function(err) {
+          console.log('SW registration failed:', err);
+        });
+      }
+    </script>
+  </body>
 </html>

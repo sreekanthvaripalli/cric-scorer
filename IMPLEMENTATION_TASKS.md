@@ -210,21 +210,21 @@
 **Dependencies:** Modules 2-5
 **Deliverable:** Installable PWA scorer + watcher, offline capable
 
-- [ ] 8.1 manifest.json — Install to home screen on Android/iOS/desktop
+- [x] 8.1 manifest.json — Install to home screen on Android/iOS/desktop
   > Done when: PWA installable
-- [ ] 8.2 sw.js — service worker caches shell (HTML/CSS/JS), offline scoring queue, sync on reconnect
+- [x] 8.2 sw.js — service worker caches shell (HTML/CSS/JS), offline scoring queue, sync on reconnect
   > Done when: Works offline after first visit
-- [ ] 8.3 Initiator dashboard: create match -> shows Match ID + share link + scoring UI
+- [x] 8.3 Initiator dashboard: create match -> shows Match ID + share link + scoring UI
   > Done when: Initiator can start match
-- [ ] 8.4 Scorer UI: big touch buttons (0-6, NB, WD, Bye, Leg bye, Wicket), bowler/striker selection, undo, over complete
+- [x] 8.4 Scorer UI: big touch buttons (0-6, NB, WD, Bye, Leg bye, Wicket), bowler/striker selection, undo, over complete
   > Done when: Touch-friendly scoring
-- [ ] 8.5 Watcher UI: enter Match ID -> live read-only scoreboard; auto-updates via WS or polling
+- [x] 8.5 Watcher UI: enter Match ID -> live read-only scoreboard; auto-updates via WS or polling
   > Done when: Watch by ID works
-- [ ] 8.6 Request scoring UI: Request scoring rights button; initiator sees approve/reject list
+- [x] 8.6 Request scoring UI: Request scoring rights button; initiator sees approve/reject list
   > Done when: Request/approve flow in UI
-- [ ] 8.7 IndexedDB fallback queue for deliveries when offline; flush to server/DB on reconnect
+- [x] 8.7 IndexedDB fallback queue for deliveries when offline; flush to server/DB on reconnect
   > Done when: Offline scoring syncs later
-- [ ] 8.8 No external CDN assets; high-contrast sunlight-friendly CSS
+- [x] 8.8 No external CDN assets; high-contrast sunlight-friendly CSS
   > Done when: Fully offline capable
 
 ---
