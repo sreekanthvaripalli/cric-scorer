@@ -3,9 +3,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+from time import time
 
-from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig, Ball
+from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig, Ball, AuditLog
 from .websocket_manager import manager
 from .models import (
     AnonymousSessionCreate, AnonymousSessionResponse, MatchCreate,
@@ -21,6 +23,45 @@ from .models import (
 )
 
 app = FastAPI(title="Cric-Scorer API", version="0.0.1")
+
+# ── Module 9: Rate Limiting Middleware ──
+_rate_limit_store: dict = defaultdict(list)
+RATE_LIMIT_REQUESTS = 100  # max requests per window
+RATE_LIMIT_WINDOW = 60  # seconds
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP from request, considering proxies."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    return request.client.host if request.client else "unknown"
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = get_client_ip(request)
+    now = time()
+    # Clean old entries
+    _rate_limit_store[client_ip] = [t for t in _rate_limit_store[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Try again later."},
+        )
+    _rate_limit_store[client_ip].append(now)
+    response = await call_next(request)
+    return response
+
+
+
+
+
+
+
 
 def get_db():
     db = get_session_local()
@@ -48,6 +89,50 @@ async def get_current_session(request: Request, db = Depends(get_db)) -> Anonymo
             db.refresh(db_session)
     return db_session
 
+def audit_log(db, actor_session_id: str, action: str, match_id: int = None, target_id: str = None, details: str = None):
+    """Create an audit log entry."""
+    entry = AuditLog(
+        actor_session_id=actor_session_id,
+        action=action,
+        match_id=match_id,
+        target_id=target_id,
+        details=details,
+    )
+    db.add(entry)
+    db.commit()
+    return entry
+
+# ── Module 9: Audit Log Endpoint ──
+@app.get("/audit-log", response_model=None)
+def get_audit_log(
+    match_id: int = None,
+    limit: int = 100,
+    db = Depends(get_db),
+    current_session = Depends(get_current_session),
+):
+    """Retrieve audit log entries. Initiator can view all logs for their matches."""
+    stmt = db.query(AuditLog)
+    if match_id is not None:
+        stmt = stmt.filter(AuditLog.match_id == match_id)
+    # If match_id is specified, only initiator can view
+    if match_id is not None:
+        match = db.query(Match).filter(Match.id == match_id).first()
+        if match and match.initiator_session_id != current_session.session_id:
+            raise HTTPException(status_code=403, detail="Only the match initiator can view audit logs for this match")
+    entries = stmt.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    return [
+        {
+            "id": e.id,
+            "actor_session_id": e.actor_session_id,
+            "action": e.action,
+            "match_id": e.match_id,
+            "target_id": e.target_id,
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "details": e.details,
+        }
+        for e in entries
+    ]
+
 @app.get("/health", status_code=200)
 def health():
     return {"status": "ok"}
@@ -63,6 +148,7 @@ def create_match(match_data: MatchCreate, db = Depends(get_db), current_session 
     role = MatchRole(match_id=new_match.id, session_id=current_session.session_id, role="initiator", scoring_rights=True, approved_by_session_id=None, approved_at=None)
     db.add(role)
     db.commit()
+    audit_log(db, current_session.session_id, "match_created", new_match.id, str(new_match.id), '{"team_a": "%s", "team_b": "%s"}' % (match_data.team_a_name, match_data.team_b_name))
     return MatchResponse(id=new_match.id, name=new_match.name, team_a_name=new_match.team_a_name, team_b_name=new_match.team_b_name, format=new_match.format, overs_per_innings=new_match.overs_per_innings, balls_per_over=new_match.balls_per_over, status=new_match.status, initiator_session_id=new_match.initiator_session_id, checksum=new_match.checksum, created_at=new_match.created_at, updated_at=new_match.updated_at, locked_at=str(new_match.locked_at) if new_match.locked_at else None)
 
 
@@ -102,6 +188,7 @@ def request_scoring(match_id: int, request_data: ScoringRightRequestCreate, db =
         db.add(request_row)
         db.commit()
         db.refresh(request_row)
+    audit_log(db, current_session.session_id, "scoring_rights_requested", match_id, str(request_row.id), '{"device_name": "%s"}' % (request_data.device_name or ""))
     return ScoringRightRequestResponse(id=request_row.id, match_id=match_id, requestor_session_id=current_session.session_id, device_name=request_data.device_name, status="pending", requested_at=datetime.now(timezone.utc), approved_at=None)
 
 
@@ -124,10 +211,31 @@ def approve_scoring_request(match_id: int, request_id: int, db = Depends(get_db)
     role.approved_by_session_id = current_session.session_id
     role.approved_at = datetime.now(timezone.utc)
     db.commit()
+    audit_log(db, current_session.session_id, "scoring_rights_granted", match_id, role.session_id, '{"granted_to": "%s"}' % role.session_id)
     return {"message": "Scoring rights approved", "request_id": request_id, "granted_to_session": role.session_id, "role": role.role, "scoring_rights": role.scoring_rights}
 
 
 @app.post("/matches/{match_id}/scoring-requests/{request_id}/reject", response_model=None)
+def reject_scoring_request(match_id: int, request_id: int, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.initiator_session_id != current_session.session_id:
+        raise HTTPException(status_code=403, detail="Only the match initiator can reject scoring requests")
+    stmt_role = select(MatchRole).where(MatchRole.match_id == match_id, MatchRole.id == request_id, MatchRole.role == "requester")
+    result = db.execute(stmt_role)
+    role = result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=404, detail="No pending scoring request found with that ID")
+    role.role = "watcher"
+    role.scoring_rights = False
+    db.commit()
+    audit_log(db, current_session.session_id, "scoring_rights_rejected", match_id, role.session_id, '{"rejected_session": "%s"}' % role.session_id)
+    return {"message": "Scoring request rejected", "request_id": request_id}
+
+
 @app.post("/matches/{match_id}/scoring-rights/revoke", response_model=None)
 def revoke_scoring_rights(match_id: int, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
     stmt = select(Match).where(Match.id == match_id)
@@ -150,11 +258,9 @@ def revoke_scoring_rights(match_id: int, db = Depends(get_db), current_session =
         role.approved_by_session_id = None
         role.approved_at = None
     db.commit()
+    audit_log(db, current_session.session_id, "scoring_rights_revoked", match_id, None, '{"revoked_count": %d}' % len(scorer_roles))
     return {"message": "Scoring rights revoked for all scorers", "match_status": match.status}
-def reject_scoring_request(match_id: int, request_id: int, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
-    stmt = select(Match).where(Match.id == match_id)
-    result = db.execute(stmt)
-    match = result.scalar_one_or_none()
+
 @app.post("/matches/{match_id}/transfer-ownership", response_model=None)
 def transfer_ownership(match_id: int, new_initiator_session_id: str, db = Depends(get_db), current_session = Depends(get_current_session)) -> dict:
     stmt = select(Match).where(Match.id == match_id)
@@ -179,6 +285,7 @@ def transfer_ownership(match_id: int, new_initiator_session_id: str, db = Depend
         old_initiator_role.role = "watcher"
         old_initiator_role.scoring_rights = False
     db.commit()
+    audit_log(db, current_session.session_id, "ownership_transferred", match_id, new_initiator_session_id, '{"from": "%s", "to": "%s"}' % (match.initiator_session_id, new_initiator_session_id))
     return {"message": "Match ownership transferred", "new_initiator": new_initiator_session_id, "match_id": match_id}
 
 
@@ -239,6 +346,7 @@ def record_ball(match_id: int, ball_data: BallRecordRequest, db = Depends(get_db
     from app.scoring.engine import process_ball
     try:
         response = process_ball(db, match, ball_data, role, innings_id, True)
+        audit_log(db, current_session.session_id, "ball_recorded", match_id, str(response.get("ball_id", "")), '{"delivery_type": "%s"}' % ball_data.delivery_type)
         return response
     except Exception as e:
         db.rollback()
@@ -275,6 +383,7 @@ def undo_ball(match_id: int, ball_id: int, db = Depends(get_db), current_session
     match.checksum = compute_checksum(match)
     match.updated_at = datetime.now(timezone.utc)
     db.commit()
+    audit_log(db, current_session.session_id, "ball_undone", match_id, str(ball_id), None)
     return {"message": "Delivery undone", "match_id": match_id, "checksum": match.checksum}
 
 
@@ -705,6 +814,7 @@ def lock_match_endpoint(
     match.locked_at = datetime.now(timezone.utc)
     match.updated_at = datetime.now(timezone.utc)
     db.commit()
+    audit_log(db, current_session.session_id, "match_locked", match_id, None, '{"status": "locked"}')
     return {
         "match_id": match_id,
         "status": match.status,
@@ -727,6 +837,7 @@ def import_match_json(import_data: dict, db = Depends(get_db), current_session =
     role = MatchRole(match_id=new_match.id, session_id=current_session.session_id, role="initiator", scoring_rights=True, approved_by_session_id=None, approved_at=None, created_at=datetime.now(timezone.utc))
     db.add(role)
     db.commit()
+    audit_log(db, current_session.session_id, "match_imported", new_match.id, str(new_match.id), '{"name": "%s"}' % match_data.get("name", "Imported"))
     teams_data = import_data.get("teams", [])
     for t in teams_data:
         link = MatchTeamLink(match_id=new_match.id, team_id=t.get("team_id"), team_role=t.get("team_role", "team_a"), is_home=t.get("is_home", False))

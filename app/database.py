@@ -318,3 +318,25 @@ class Ball(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class AuditLog(Base):
+    """Audit log entry for authorization and security events.
+
+    Records every scoring-rights change, match lock/unlock,
+    ownership transfer, and other security-relevant actions.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    actor_session_id = Column(String(36), nullable=False)
+    action = Column(String(50), nullable=False)
+    match_id = Column(Integer, nullable=True, index=True)
+    target_id = Column(String(50), nullable=True)
+    timestamp = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    details = Column(Text, nullable=True)

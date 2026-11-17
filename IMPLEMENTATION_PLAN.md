@@ -243,7 +243,7 @@
 7. **Module 6** → scorecard + result  
 8. **Module 7 → persistence + export/import** [x]  
 9. **Module 8 → PWA frontend (scorer + watcher UIs)** [x]  
-10. **Module 9** → auth + audit  
+10. **Module 9 → auth + audit** [x]  
 11. **Module 13** → MVP determination (after scoring engine & result)  
 12. **Module 10** → full QA  
 13. **Module 11** → deploy to free cloud  

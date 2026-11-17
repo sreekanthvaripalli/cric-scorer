@@ -234,17 +234,17 @@
 **Dependencies:** Module 2
 **Deliverable:** Secure scoring-rights model with audit trail
 
-- [ ] 9.1 Middleware: scoring_rights=true required for POST /balls, POST /undo, match settings
+- [x] 9.1 Middleware: scoring_rights=true required for POST /balls, POST /undo, match settings
   > Done when: 403 on unauthorised scoring
-- [ ] 9.2 Initiator-only endpoints: approve/reject requests, revoke rights, transfer ownership, lock match
+- [x] 9.2 Initiator-only endpoints: approve/reject requests, revoke rights, transfer ownership, lock match
   > Done when: 403 if non-initiator calls
-- [ ] 9.3 Match lock: once locked (result confirmed), no scoring edits; admin unlock + audit log required
+- [x] 9.3 Match lock: once locked (result confirmed), no scoring edits; admin unlock + audit log required
   > Done when: Locked match cannot be scored
-- [ ] 9.4 Audit log table: actor_session_id, action, match_id, target_id, timestamp, details
+- [x] 9.4 Audit log table: actor_session_id, action, match_id, target_id, timestamp, details
   > Done when: Every rights change logged
-- [ ] 9.5 Simple rate limiting on WS connections (per IP)
+- [x] 9.5 Simple rate limiting on WS connections (per IP)
   > Done when: WS abuse limited
-- [ ] 9.6 Local mode = no auth required (single device); cloud mode = token-based auth (optional)
+- [x] 9.6 Local mode = no auth required (single device); cloud mode = token-based auth (optional)
   > Done when: Auth optional for local
 
 ---
