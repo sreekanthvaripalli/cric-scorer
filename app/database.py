@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -9,16 +10,37 @@ from sqlalchemy import (
     Integer,
     Text,
     func,
+    create_engine,
 )
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
-session_local = scoped_session(sessionmaker(autocommit=False, autoflush=False))
+
+# ── Database configuration ────────────────────────────────────────────────
+# DATABASE_URL defaults to a local SQLite file (cric_scorer.db beside the app).
+# Set DATABASE_URL env var to switch to PostgreSQL or another backend.
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "sqlite:///./cric_scorer.db"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+
+session_local = scoped_session(
+    sessionmaker(autocommit=False, autoflush=False, bind=engine)
+)
 
 
 def get_session_local():
     return session_local
+
+
+def init_db():
+    """Create all tables defined on Base. Call this at application startup."""
+    Base.metadata.create_all(bind=engine)
 
 
 class AnonymousSession(Base):

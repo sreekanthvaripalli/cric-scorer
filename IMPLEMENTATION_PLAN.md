@@ -241,7 +241,7 @@
 5. **Module 4** → scoring engine (write unit tests as you go)  
 6. **Module 5** → WS live broadcast + public watcher page  
 7. **Module 6** → scorecard + result  
-8. **Module 7** → persistence + export/import  
+8. **Module 7 → persistence + export/import** [x]  
 9. **Module 8** → PWA frontend (scorer + watcher UIs)  
 10. **Module 9** → auth + audit  
 11. **Module 13** → MVP determination (after scoring engine & result)  

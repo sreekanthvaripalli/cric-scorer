@@ -188,19 +188,19 @@
 **Dependencies:** Modules 1-4
 **Deliverable:** SQLite persistence + export/import
 
-- [ ] 7.1 SQLAlchemy models + Alembic migrations (or create_all for v1)
+- [x] 7.1 SQLAlchemy models + Alembic migrations (or create_all for v1)
   > Done when: db upgrade works
-- [ ] 7.2 SQLite default (cric_scorer.db beside app); DATABASE_URL env var switches to PostgreSQL
+- [x] 7.2 SQLite default (cric_scorer.db beside app); DATABASE_URL env var switches to PostgreSQL
   > Done when: Local DB file created automatically
-- [ ] 7.3 GET /matches/{id}/export/json — full match JSON
+- [x] 7.3 GET /matches/{id}/export/json — full match JSON
   > Done when: JSON downloadable
-- [ ] 7.4 GET /matches/{id}/export/csv — scorecard CSV
+- [x] 7.4 GET /matches/{id}/export/csv — scorecard CSV
   > Done when: CSV downloadable
-- [ ] 7.5 GET /matches/{id}/export/pdf — printable PDF scorecard (ReportLab or jspdf)
+- [x] 7.5 GET /matches/{id}/export/pdf — printable PDF scorecard (ReportLab or jspdf)
   > Done when: PDF opens/prints
-- [ ] 7.6 POST /import/json — restore a match from JSON (move matches between devices)
+- [x] 7.6 POST /import/json — restore a match from JSON (move matches between devices)
   > Done when: Import round-trip preserves all deliveries
-- [ ] 7.7 Auto-backup copy before major mutations (undo, result lock)
+- [x] 7.7 Auto-backup copy before major mutations (undo, result lock)
   > Done when: .bak file created
 
 ---

@@ -711,3 +711,271 @@ def lock_match_endpoint(
         "locked_at": str(match.locked_at) if match.locked_at else None,
         "message": "Match locked successfully",
     }
+
+@app.post("/import/json", response_model=None)
+def import_match_json(import_data: dict, db = Depends(get_db), current_session = Depends(get_current_session)):
+    match_data = import_data.get("match", {})
+    if not match_data:
+        raise HTTPException(status_code=400, detail="No match data in import")
+    db_path = _get_db_path()
+    if db_path:
+        _backup_db(db_path)
+    new_match = Match(name=match_data.get("name", f"Imported Match {datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"), team_a_name=match_data.get("team_a_name", "Team A"), team_b_name=match_data.get("team_b_name", "Team B"), format=match_data.get("format", "Custom"), overs_per_innings=match_data.get("overs_per_innings", 20), balls_per_over=match_data.get("balls_per_over", 6), status="created", initiator_session_id=current_session.session_id, checksum=None)
+    db.add(new_match)
+    db.commit()
+    db.refresh(new_match)
+    role = MatchRole(match_id=new_match.id, session_id=current_session.session_id, role="initiator", scoring_rights=True, approved_by_session_id=None, approved_at=None, created_at=datetime.now(timezone.utc))
+    db.add(role)
+    db.commit()
+    teams_data = import_data.get("teams", [])
+    for t in teams_data:
+        link = MatchTeamLink(match_id=new_match.id, team_id=t.get("team_id"), team_role=t.get("team_role", "team_a"), is_home=t.get("is_home", False))
+        db.add(link)
+    players_data = import_data.get("players", [])
+    player_id_map = {}
+    for p in players_data:
+        old_id = p.get("id")
+        new_player = Player(match_id=new_match.id, team_id=p.get("team_id"), name=p.get("name", "Unknown"), role=p.get("role", "all-rounder"), jersey_number=p.get("jersey_number"), is_substitute=p.get("is_substitute", False))
+        db.add(new_player)
+        db.flush()
+        if old_id:
+            player_id_map[old_id] = new_player.id
+    squads_data = import_data.get("squads", [])
+    for s in squads_data:
+        squad = MatchSquad(match_id=new_match.id, player_id=player_id_map.get(s.get("player_id", s.get("player_id"))), team_id=s.get("team_id"), is_substitute=s.get("is_substitute", False))
+        db.add(squad)
+    xis_data = import_data.get("playing_xi", [])
+    for xi in xis_data:
+        xi_entry = PlayingXI(match_id=new_match.id, player_id=player_id_map.get(xi.get("player_id", xi.get("player_id"))), team_id=xi.get("team_id"), is_captain=xi.get("is_captain", False), is_wicketkeeper=xi.get("is_wicketkeeper", False))
+        db.add(xi_entry)
+    toss_data = import_data.get("toss")
+    if toss_data:
+        toss = Toss(match_id=new_match.id, initiator_call=toss_data.get("initiator_call"), coin_result=toss_data.get("coin_result"), winner_team_id=toss_data.get("winner_team_id"), toss_decision=toss_data.get("toss_decision"), called_by_session_id=toss_data.get("called_by_session_id"))
+        db.add(toss)
+    balls_data = import_data.get("balls", [])
+    for b in balls_data:
+        ball = Ball(match_id=new_match.id, innings_id=b.get("innings_id", 1), over_number=b.get("over_number", 1), ball_number=b.get("ball_number", 1), striker_id=player_id_map.get(b.get("striker_id"), b.get("striker_id")), non_striker_id=player_id_map.get(b.get("non_striker_id"), b.get("non_striker_id")), bowler_id=player_id_map.get(b.get("bowler_id"), b.get("bowler_id")), runs_batter=b.get("runs_batter", 0), runs_extras=b.get("runs_extras", 0), extra_type=b.get("extra_type"), penalty_runs=b.get("penalty_runs", 0), is_wicket=b.get("is_wicket", False), dismissal_mode=b.get("dismissal_mode"), fielder_id=player_id_map.get(b.get("fielder_id"), b.get("fielder_id")) if b.get("fielder_id") else None, short_runs=b.get("short_runs", 0), boundary_type=b.get("boundary_type"), is_free_hit=b.get("is_free_hit", False), is_valid_ball=b.get("is_valid_ball", True), is_over_completed=b.get("is_over_completed", False), is_shot_out=b.get("is_shot_out", False))
+        db.add(ball)
+    db.commit()
+    db.refresh(new_match)
+    return {"match_id": new_match.id, "message": "Match imported successfully", "imported_balls": len(balls_data)}
+@app.get("/matches/{match_id}/export/pdf", response_model=None)
+def export_match_pdf(match_id: int, db = Depends(get_db)):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    elements.append(Paragraph("Cric-Scorer - Match Scorecard", styles["Title"]))
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"<b>Match:</b> {match.team_a_name} vs {match.team_b_name}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Format:</b> {match.format} | <b>Overs:</b> {match.overs_per_innings}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Status:</b> {match.status}", styles["Normal"]))
+    elements.append(Spacer(1, 12))
+    player_map = {}
+    for p in db.query(Player).all():
+        player_map[p.id] = p.name
+    for innings_id in (1, 2):
+        balls = db.query(Ball).filter(Ball.match_id == match_id, Ball.innings_id == innings_id, Ball.is_valid_ball == True).order_by(Ball.id).all()
+        if not balls:
+            continue
+        elements.append(Paragraph(f"Innings {innings_id}", styles["Heading2"]))
+        elements.append(Spacer(1, 6))
+        batters = {}
+        for b in balls:
+            pid = b.striker_id
+            if pid not in batters:
+                batters[pid] = {"runs": 0, "balls": 0, "fours": 0, "sixes": 0, "dismissal": None}
+            batters[pid]["runs"] += b.runs_batter
+            batters[pid]["balls"] += 1
+            if b.boundary_type == "4":
+                batters[pid]["fours"] += 1
+            elif b.boundary_type == "6":
+                batters[pid]["sixes"] += 1
+            if b.is_wicket and b.striker_id == pid:
+                batters[pid]["dismissal"] = b.dismissal_mode or "out"
+        batting_data = [["Player", "Runs", "Balls", "4s", "6s", "SR", "Dismissal"]]
+        total_runs = 0
+        total_wickets = 0
+        for pid, data in batters.items():
+            sr = round((data["runs"] / data["balls"]) * 100, 2) if data["balls"] > 0 else 0.0
+            total_runs += data["runs"]
+            if data["dismissal"]:
+                total_wickets += 1
+            batting_data.append([player_map.get(pid, f"Player {pid}"), str(data["runs"]), str(data["balls"]), str(data["fours"]), str(data["sixes"]), str(sr), data["dismissal"] or ""])
+        batting_data.append(["Total", str(total_runs), "", "", "", "", f"{total_wickets} wkts"])
+        bt = Table(batting_data)
+        bt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.grey), ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke), ("GRID", (0, 0), (-1, -1), 0.5, colors.black), ("ALIGN", (1, 0), (-1, -1), "CENTER")]))
+        elements.append(bt)
+        elements.append(Spacer(1, 12))
+        bowlers = {}
+        for b in balls:
+            pid = b.bowler_id
+            if pid not in bowlers:
+                bowlers[pid] = {"overs_count": 0.0, "maidens": 0, "runs": 0, "wickets": 0, "wides": 0, "no_balls": 0}
+            bowlers[pid]["overs_count"] += b.ball_number / 6.0
+            bowlers[pid]["runs"] += b.runs_batter + b.runs_extras
+            if b.is_wicket:
+                bowlers[pid]["wickets"] += 1
+            if b.extra_type == "wd":
+                bowlers[pid]["wides"] += 1
+            elif b.extra_type == "nb":
+                bowlers[pid]["no_balls"] += 1
+        bowling_data = [["Player", "Overs", "Mdns", "Runs", "Wkts", "Wides", "NB", "Econ"]]
+        for pid, data in bowlers.items():
+            over_whole = int(data["overs_count"])
+            over_balls = round((data["overs_count"] - over_whole) * 6)
+            over_str = f"{over_whole}.{over_balls}"
+            econ = round(data["runs"] / data["overs_count"], 2) if data["overs_count"] > 0 else 0.0
+            bowling_data.append([player_map.get(pid, f"Player {pid}"), over_str, str(data["maidens"]), str(data["runs"]), str(data["wickets"]), str(data["wides"]), str(data["no_balls"]), str(econ)])
+        bl = Table(bowling_data)
+        bl.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.grey), ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke), ("GRID", (0, 0), (-1, -1), 0.5, colors.black), ("ALIGN", (1, 0), (-1, -1), "CENTER")]))
+        elements.append(bl)
+        elements.append(Spacer(1, 12))
+    doc.build(elements)
+    output.seek(0)
+    return StreamingResponse(output, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="match_{match_id}_scorecard.pdf"'})
+@app.get("/matches/{match_id}/export/json", response_model=None)
+def export_match_json(match_id: int, db = Depends(get_db)):
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    data = _match_to_dict(db, match)
+    return data
+
+
+@app.get("/matches/{match_id}/export/csv", response_model=None)
+def export_match_csv(match_id: int, db = Depends(get_db)):
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Cric-Scorer Match Export"])
+    writer.writerow([f"Match: {match.name} ({match.team_a_name} vs {match.team_b_name})"])
+    writer.writerow([f"Format: {match.format}, Overs: {match.overs_per_innings}"])
+    writer.writerow([f"Status: {match.status}"])
+    writer.writerow([])
+    for innings_id in (1, 2):
+        balls = db.query(Ball).filter(Ball.match_id == match_id, Ball.innings_id == innings_id, Ball.is_valid_ball == True).order_by(Ball.id).all()
+        if not balls:
+            continue
+        writer.writerow([f"=== Innings {innings_id} ==="])
+        writer.writerow([])
+        writer.writerow(["Batting Scorecard"])
+        writer.writerow(["Player", "Runs", "Balls", "4s", "6s", "SR", "Dismissal"])
+        batters = {}
+        for b in balls:
+            pid = b.striker_id
+            if pid not in batters:
+                batters[pid] = {"runs": 0, "balls": 0, "fours": 0, "sixes": 0, "dismissal": None}
+            batters[pid]["runs"] += b.runs_batter
+            batters[pid]["balls"] += 1
+            if b.boundary_type == "4":
+                batters[pid]["fours"] += 1
+            elif b.boundary_type == "6":
+                batters[pid]["sixes"] += 1
+            if b.is_wicket and b.striker_id == pid:
+                batters[pid]["dismissal"] = b.dismissal_mode or "out"
+        player_map = {}
+        for p in db.query(Player).all():
+            player_map[p.id] = p.name
+        for pid, data in batters.items():
+            sr = round((data["runs"] / data["balls"]) * 100, 2) if data["balls"] > 0 else 0.0
+            writer.writerow([player_map.get(pid, f"Player {pid}"), data["runs"], data["balls"], data["fours"], data["sixes"], sr, data["dismissal"] or ""])
+        writer.writerow([])
+        writer.writerow(["Bowling Analysis"])
+        writer.writerow(["Player", "Overs", "Maidens", "Runs", "Wickets", "Wides", "No Balls", "Economy"])
+        bowlers = {}
+        for b in balls:
+            pid = b.bowler_id
+            if pid not in bowlers:
+                bowlers[pid] = {"overs_count": 0.0, "maidens": 0, "runs": 0, "wickets": 0, "wides": 0, "no_balls": 0}
+            bowlers[pid]["overs_count"] += b.ball_number / 6.0
+            bowlers[pid]["runs"] += b.runs_batter + b.runs_extras
+            if b.is_wicket:
+                bowlers[pid]["wickets"] += 1
+            if b.extra_type == "wd":
+                bowlers[pid]["wides"] += 1
+            elif b.extra_type == "nb":
+                bowlers[pid]["no_balls"] += 1
+        for pid, data in bowlers.items():
+            over_whole = int(data["overs_count"])
+            over_balls = round((data["overs_count"] - over_whole) * 6)
+            over_str = f"{over_whole}.{over_balls}"
+            econ = round(data["runs"] / data["overs_count"], 2) if data["overs_count"] > 0 else 0.0
+            writer.writerow([player_map.get(pid, f"Player {pid}"), over_str, data["maidens"], data["runs"], data["wickets"], data["wides"], data["no_balls"], econ])
+        writer.writerow([])
+        writer.writerow(["Extras Summary"])
+        no_balls = sum(1 for b in balls if b.extra_type == "nb")
+        wides = sum(1 for b in balls if b.extra_type == "wd")
+        byes = sum(1 for b in balls if b.extra_type == "bye")
+        leg_byes = sum(1 for b in balls if b.extra_type == "legbye")
+        penalties = sum(b.penalty_runs for b in balls)
+        total_extras = sum(b.runs_extras for b in balls) + penalties
+        writer.writerow(["No Balls", no_balls])
+        writer.writerow(["Wides", wides])
+        writer.writerow(["Byes", byes])
+        writer.writerow(["Leg Byes", leg_byes])
+        writer.writerow(["Penalties", penalties])
+        writer.writerow(["Total Extras", total_extras])
+        writer.writerow([])
+    output.seek(0)
+    return StreamingResponse(io.BytesIO(output.getvalue().encode("utf-8")), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=match_" + str(match_id) + "_scorecard.csv"})
+def _match_to_dict(db, match):
+    team_links = db.query(MatchTeamLink).filter(MatchTeamLink.match_id == match.id).all()
+    teams = [{"team_id": tl.team_id, "team_role": tl.team_role, "is_home": tl.is_home} for tl in team_links]
+    players = db.query(Player).all()
+    players_list = [{"id": p.id, "team_id": p.team_id, "name": p.name, "role": p.role, "jersey_number": p.jersey_number, "is_substitute": p.is_substitute} for p in players]
+    squads = db.query(MatchSquad).filter(MatchSquad.match_id == match.id).all()
+    squads_list = [{"id": s.id, "match_id": s.match_id, "player_id": s.player_id, "team_id": s.team_id, "is_substitute": s.is_substitute} for s in squads]
+    xis = db.query(PlayingXI).filter(PlayingXI.match_id == match.id).all()
+    xis_list = [{"id": xi.id, "match_id": xi.match_id, "player_id": xi.player_id, "team_id": xi.team_id, "is_captain": xi.is_captain, "is_wicketkeeper": xi.is_wicketkeeper} for xi in xis]
+    toss = db.query(Toss).filter(Toss.match_id == match.id).first()
+    toss_data = None
+    if toss:
+        toss_data = {"id": toss.id, "match_id": toss.match_id, "initiator_call": toss.initiator_call, "coin_result": toss.coin_result, "winner_team_id": toss.winner_team_id, "toss_decision": toss.toss_decision, "called_by_session_id": toss.called_by_session_id, "created_at": str(toss.created_at) if toss.created_at else None}
+    formats = db.query(FormatConfig).all()
+    formats_list = [{"id": f.id, "format_name": f.format_name, "overs_per_innings": f.overs_per_innings, "balls_per_over": f.balls_per_over, "max_overs_per_bowler": f.max_overs_per_bowler, "free_hit_after_no_ball": f.free_hit_after_no_ball, "powerplay_max_overs": f.powerplay_max_overs, "new_ball_every_overs": f.new_ball_every_overs, "follow_on_threshold": f.follow_on_threshold} for f in formats]
+    balls = db.query(Ball).filter(Ball.match_id == match.id).order_by(Ball.id).all()
+    balls_list = [{"id": b.id, "match_id": b.match_id, "innings_id": b.innings_id, "over_number": b.over_number, "ball_number": b.ball_number, "striker_id": b.striker_id, "non_striker_id": b.non_striker_id, "bowler_id": b.bowler_id, "runs_batter": b.runs_batter, "runs_extras": b.runs_extras, "extra_type": b.extra_type, "penalty_runs": b.penalty_runs, "is_wicket": b.is_wicket, "dismissal_mode": b.dismissal_mode, "fielder_id": b.fielder_id, "short_runs": b.short_runs, "boundary_type": b.boundary_type, "is_free_hit": b.is_free_hit, "is_valid_ball": b.is_valid_ball, "is_over_completed": b.is_over_completed, "is_shot_out": b.is_shot_out, "created_at": str(b.created_at) if b.created_at else None} for b in balls]
+    return {"match": {"id": match.id, "name": match.name, "venue": match.venue, "date": str(match.date) if match.date else None, "format": match.format, "overs_per_innings": match.overs_per_innings, "balls_per_over": match.balls_per_over, "status": match.status, "initiator_session_id": match.initiator_session_id, "checksum": match.checksum, "created_at": str(match.created_at) if match.created_at else None, "updated_at": str(match.updated_at) if match.updated_at else None, "locked_at": str(match.locked_at) if match.locked_at else None, "team_a_name": match.team_a_name, "team_b_name": match.team_b_name}, "teams": teams, "players": players_list, "squads": squads_list, "playing_xi": xis_list, "toss": toss_data, "format_configs": formats_list, "balls": balls_list}
+
+
+def _backup_db(db_path):
+    if not db_path or not os.path.exists(db_path):
+        return None
+    backup_path = f"{db_path}.bak"
+    shutil.copy2(db_path, backup_path)
+    return backup_path
+from sqlalchemy import select
+
+from app.database import DATABASE_URL
+
+# ── Module 7: Persistence, Export & Import ────────────────────────────────
+
+import os
+import csv
+import io
+import json
+import shutil
+from fastapi.responses import StreamingResponse
+
+
+def _get_db_path():
+    url = DATABASE_URL
+    if url.startswith("sqlite:///"):
+        return url.replace("sqlite:///", "")
+    return None
