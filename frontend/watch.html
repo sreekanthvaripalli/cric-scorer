@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cric-Scorer || Live Watch</title>
+    <link rel="stylesheet" href="/static/css/global.css">
+    <link rel="stylesheet" href="/static/css/live.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Cric-Scorer</h1>
+            <a href="/" class="back-link">← Matches</a>
+        </header>
+
+        <main class="main">
+            <!-- Match info -->
+            <div class="card match-info">
+                <h2>Match</h2>
+                <p id="match-name">Loading...</p>
+                <p>
+                    <span id="team-a">—</span> vs <span id="team-b">—</span>
+                </p>
+                <p>Format: <span id="format">—</span> | Overs: <span id="overs">—</span></p>
+                <p>Status: <span id="status" class="status">—</span></p>
+            </div>
+
+            <!-- Scoreboard -->
+            <div class="card scoreboard">
+                <h2>Score</h2>
+                <div class="score-box">
+                    <div class="team-score">
+                        <span class="team-name" id="team-a-score">Team A</span>
+                        <span class="score" id="team-a-runs">0</span>
+                        <span class="wickets" id="team-a-wickets">0/0</span>
+                    </div>
+                    <div class="score-box-over">
+                        <span class="overs" id="team-a-overs">0.0</span>
+                    </div>
+                </div>
+                <div class="score-box">
+                    <div class="team-score">
+                        <span class="team-name" id="team-b-score">Team B</span>
+                        <span class="score" id="team-b-runs">0</span>
+                        <span class="wickets" id="team-b-wickets">0/0</span>
+                    </div>
+                    <div class="score-box-over">
+                        <span class="overs" id="team-b-overs">0.0</span>
+                    </div>
+                </div>
+                <div class="powerplay" id="powerplay-bar">
+                    <div class="powerplay-fill" id="powerplay-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Live ball feed -->
+            <div class="card ball-feed">
+                <h2>Last 10 Balls</h2>
+                <div id="ball-feed" class="ball-feed-list">
+                    <p class="placeholder">No deliveries yet. Connect to watch live scoring.</p>
+                </div>
+            </div>
+
+            <!-- Toss result (if available) -->
+            <div class="card toss-box" id="toss-box">
+                <h2>Toss</h2>
+                <div id="toss-content">
+                    <p class="placeholder">Toss not yet complete</p>
+                </div>
+            </div>
+
+            <!-- Presence -->
+            <div class="card presence">
+                <h2>Live</h2>
+                <p>Connections: <span id="connection-count">0</span></p>
+                <p>Last update: <span id="last-update">Never</span></p>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/live.js"></script>
+</body>
+</html>

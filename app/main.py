@@ -5,7 +5,8 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 
-from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig
+from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig, Ball
+from .websocket_manager import manager
 from .models import (
     AnonymousSessionCreate, AnonymousSessionResponse, MatchCreate,
     MatchResponse, MatchPublicResponse, MatchRoleCreate, MatchRoleResponse,
@@ -488,3 +489,115 @@ def record_toss_decision(match_id: int, toss_result: TossResultData, db = Depend
         match.updated_at = datetime.now(timezone.utc)
         db.commit()
     return TossResponse(id=toss.id, match_id=match_id, initiator_call=toss.initiator_call, coin_result=toss.coin_result, winner_team_id=toss.winner_team_id, toss_decision=toss.toss_decision, called_by_session_id=toss.called_by_session_id, created_at=toss.created_at)
+
+
+# ── Module 5: Live Score Broadcasting & Public Watch ─────────────────────────
+
+
+@app.get("/matches/{match_id}/live", response_model=None)
+def get_match_live(match_id: int, db = Depends(get_db)) -> dict:
+    """Polling fallback for clients without WebSocket support.
+
+    Returns current match state: score, overs, wickets, last deliveries.
+    """
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # Get the last 10 balls
+    balls = db.query(Ball).filter(Ball.match_id == match_id).order_by(Ball.id.desc()).limit(10).all()
+    balls.reverse()
+
+    # Compute current score per innings
+    runs_by_innings = {1: 0, 2: 0}
+    wickets_by_innings = {1: 0, 2: 0}
+    for ball in balls:
+        if ball.innings_id in runs_by_innings:
+            runs_by_innings[ball.innings_id] += ball.runs_batter + ball.runs_extras
+        if ball.is_wicket:
+            wickets_by_innings[ball.innings_id] += 1
+
+    current_score = f"{runs_by_innings[1]}/{wickets_by_innings[1]}" if runs_by_innings[1] > 0 else "0/0"
+
+    return {
+        "match": {
+            "id": match.id,
+            "name": match.name,
+            "team_a_name": match.team_a_name,
+            "team_b_name": match.team_b_name,
+            "format": match.format,
+            "overs_per_innings": match.overs_per_innings,
+            "status": match.status,
+            "updated_at": match.updated_at.isoformat() if match.updated_at else None,
+        },
+        "ball": {
+            "delivery": [
+                {
+                    "ball_id": b.ball_id,
+                    "over_number": b.over_number,
+                    "ball_number": b.ball_number,
+                    "striker_id": b.striker_id,
+                    "non_striker_id": b.non_striker_id,
+                    "bowler_id": b.bowler_id,
+                    "runs_batter": b.runs_batter,
+                    "runs_extras": b.runs_extras,
+                    "extra_type": b.extra_type,
+                    "is_wicket": b.is_wicket,
+                    "dismissal_mode": b.dismissal_mode,
+                    "boundary_type": b.boundary_type,
+                }
+                for b in balls
+            ],
+            "overs": round(sum(b.over_number + b.ball_number / 6.0 for b in balls) / max(1, len(balls)), 1),
+            "striker_runs": balls[0].runs_batter if balls else 0,
+            "non_striker_runs": balls[0].runs_batter if balls else 0,
+            "wickets_a": wickets_by_innings[1],
+            "wickets_b": wickets_by_innings[2],
+        } if balls else None,
+        "toss": None,
+        "presence": {
+            "is_connected": True,
+            "connections": manager.get_connection_count(match_id),
+        },
+    }
+
+
+@app.websocket("/ws/match/{match_id}")
+async def websocket_match(websocket: WebSocket, match_id: int):
+    """WebSocket endpoint for live score broadcasting.
+
+    Scorers and watchers connect here. The server broadcasts match state
+    (new deliveries, undo, result changes) to all connected clients in real-time.
+    """
+    await manager.connect(websocket, match_id)
+
+    try:
+        # Send initial state to the newly connected client
+        initial_state = {
+            "match": {
+                "id": match_id,
+                "name": "Loading...",
+                "team_a_name": "Team A",
+                "team_b_name": "Team B",
+                "format": "Custom",
+                "overs_per_innings": 20,
+                "status": "in_progress",
+            },
+            "ball": None,
+            "toss": None,
+            "presence": {"is_connected": True, "connections": manager.get_connection_count(match_id)},
+            "type": "initial_state",
+        }
+        await manager.broadcast(match_id, initial_state)
+
+        # Keep connection alive - receive messages to detect disconnect
+        while True:
+            data = await websocket.receive_text()
+            # Client heartbeat - ignore content but keep connection alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, match_id)
+    except Exception as e:
+        print(f"WebSocket error for match {match_id}: {e}")
+        manager.disconnect(websocket, match_id)

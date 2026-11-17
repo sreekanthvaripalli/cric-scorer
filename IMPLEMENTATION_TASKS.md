@@ -142,17 +142,17 @@
 **Dependencies:** Modules 2-4
 **Deliverable:** Live watch by match ID; real-time score updates
 
-- [ ] 5.1 WebSocket endpoint WS /ws/match/{id} — scorers and watchers connect; server broadcasts match state JSON on every change
+- [x] 5.1 WebSocket endpoint WS /ws/match/{id} — scorers and watchers connect; server broadcasts match state JSON on every change
   > Done when: WS connection works
-- [ ] 5.2 On new delivery / undo / result change, broadcast full payload to all connected clients for that match_id
+- [x] 5.2 On new delivery / undo / result change, broadcast full payload to all connected clients for that match_id
   > Done when: Real-time push works
-- [ ] 5.3 GET /watch/{id} — read-only HTML watcher page: scoreboard, overs, wickets, recent balls, no scoring buttons; connects to WS and auto-updates
+- [x] 5.3 GET /watch/{id} — read-only HTML watcher page: scoreboard, overs, wickets, recent balls, no scoring buttons; connects to WS and auto-updates
   > Done when: Public watcher page loads by match ID
-- [ ] 5.4 Fallback poll endpoint GET /matches/{id}/live for clients without WS support
+- [x] 5.4 Fallback poll endpoint GET /matches/{id}/live for clients without WS support
   > Done when: Polling returns current state
-- [ ] 5.5 Reconnection: on WS reconnect, server sends current full match state so client catches up
+- [x] 5.5 Reconnection: on WS reconnect, server sends current full match state so client catches up
   > Done when: No data loss on reconnect
-- [ ] 5.6 Presence (optional): show count of current watchers/scorers on watcher page
+- [x] 5.6 Presence (optional): show count of current watchers/scorers on watcher page
   > Done when: Presence displayed
 
 ---
