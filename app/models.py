@@ -498,3 +498,74 @@ class LockMatchResponse(BaseModel):
     status: str
     locked_at: Optional[datetime]
     message: str
+
+
+# ── MVP Models ──
+
+
+class MVPPointsBreakdown(BaseModel):
+    """Points breakdown for a player from delivery log."""
+
+    player_id: int
+    name: str
+    team_id: int
+    runs: int = 0
+    wickets: int = 0
+    fours: int = 0
+    sixes: int = 0
+    catches: int = 0
+    run_outs: int = 0
+    balls_faced: int = 0
+    strike_rate: float = 0.0
+    overs_bowled: float = 0.0
+    economy_rate: float = 0.0
+    points_runs: int = 0  # 1 point per run
+    points_wickets: int = 0  # 10 points per wicket
+    points_catches: int = 0  # 5 points per catch
+    points_run_outs: int = 0  # 5 points per run-out
+    points_strike_rate: int = 0  # bonus for SR > 150
+    points_economy: int = 0  # bonus for economy < 7
+    points_win_bonus: int = 0  # bonus for winning team
+    total_points: int = 0
+
+
+class MVPCandidate(BaseModel):
+    """MVP candidate with points breakdown."""
+
+    player_id: int
+    name: str
+    team_id: int
+    team_role: str
+    total_points: int
+    breakdown: MVPPointsBreakdown
+
+
+class MVPCreate(BaseModel):
+    """Request to create an MVP award."""
+
+    player_id: int = Field(..., description="Player ID to award MVP to")
+    points: int = Field(..., ge=0, description="Total points for the MVP")
+    reason_summary: Optional[str] = Field(None, max_length=500, description="Reason for award")
+
+
+class MVPResponse(BaseModel):
+    """Response model for MVP award."""
+
+    id: int
+    match_id: int
+    player_id: int
+    points: int
+    reason_summary: Optional[str]
+    awarded_by_session_id: str
+    awarded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MvpAwardRequest(BaseModel):
+    """Request to award MVP to a player."""
+
+    player_id: int = Field(..., description="Player ID to award MVP to")
+    points: int = Field(..., ge=0, description="Total points for the MVP")
+    reason_summary: Optional[str] = Field(None, max_length=500, description="Reason for award")

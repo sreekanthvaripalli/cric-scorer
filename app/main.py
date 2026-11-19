@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from time import time
 
-from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig, Ball, AuditLog
+from .database import AnonymousSession, Match, MatchRole, Base, get_session_local, Team, Player, MatchTeamLink, MatchSquad, PlayingXI, Toss, FormatConfig, Ball, AuditLog, MVP
 from .websocket_manager import manager
 from .models import (
     AnonymousSessionCreate, AnonymousSessionResponse, MatchCreate,
@@ -101,6 +101,131 @@ def audit_log(db, actor_session_id: str, action: str, match_id: int = None, targ
     db.add(entry)
     db.commit()
     return entry
+
+
+# ── Module 13: MVP Points Algorithm ──
+
+
+def _get_player_name_map(db, match_id: int):
+    squads = db.query(MatchSquad).filter(MatchSquad.match_id == match_id).all()
+    result = {}
+    for squad in squads:
+        player = db.query(Player).filter(Player.id == squad.player_id).first()
+        if player:
+            result[player.id] = (player.name, player.team_id)
+    return result
+
+
+def calculate_mvp_points(db, match_id: int):
+    balls = db.query(Ball).filter(Ball.match_id == match_id).all()
+    player_map = _get_player_name_map(db, match_id)
+    stats = {}
+
+    def get_or_create(pid):
+        if pid not in stats:
+            name, team_id = player_map.get(pid, (f"Player {pid}", 0))
+            stats[pid] = {
+                "player_id": pid, "name": name, "team_id": team_id,
+                "runs": 0, "balls_faced": 0, "fours": 0, "sixes": 0,
+                "wickets": 0, "catches": 0, "run_outs": 0,
+                "balls_bowled": 0, "runs_conceded": 0, "extras_conceded": 0,
+            }
+        return stats[pid]
+
+    for b in balls:
+        s = get_or_create(b.striker_id)
+        s["runs"] += b.runs_batter
+        if b.is_valid_ball:
+            s["balls_faced"] += 1
+        if b.boundary_type == "4":
+            s["fours"] += 1
+        elif b.boundary_type == "6":
+            s["sixes"] += 1
+
+        bl = get_or_create(b.bowler_id)
+        if b.is_valid_ball:
+            bl["balls_bowled"] += 1
+        bl["runs_conceded"] += b.runs_batter + b.runs_extras
+        bl["extras_conceded"] += b.runs_extras
+
+        if b.is_wicket:
+            bl["wickets"] += 1
+            if b.fielder_id:
+                f = get_or_create(b.fielder_id)
+                if b.dismissal_mode == "run_out":
+                    f["run_outs"] += 1
+                else:
+                    f["catches"] += 1
+
+    candidates = []
+    for pid, data in stats.items():
+        breakdown = MVPPointsBreakdown(
+            player_id=pid, name=data["name"], team_id=data["team_id"],
+            runs=data["runs"], wickets=data["wickets"], fours=data["fours"],
+            sixes=data["sixes"], catches=data["catches"], run_outs=data["run_outs"],
+            balls_faced=data["balls_faced"],
+        )
+        if data["balls_faced"] > 0:
+            breakdown.strike_rate = round((data["runs"] / data["balls_faced"]) * 100, 2)
+        if data["balls_bowled"] > 0:
+            whole = data["balls_bowled"] // 6
+            remainder = data["balls_bowled"] % 6
+            breakdown.overs_bowled = float(f"{whole}.{remainder}") if remainder > 0 else float(whole)
+            valid_runs = data["runs_conceded"] - data["extras_conceded"]
+            if breakdown.overs_bowled > 0:
+                breakdown.economy_rate = round(valid_runs / breakdown.overs_bowled, 2)
+
+        breakdown.points_runs = data["runs"]
+        breakdown.points_wickets = data["wickets"] * 10
+        breakdown.points_catches = data["catches"] * 5
+        breakdown.points_run_outs = data["run_outs"] * 5
+        if data["balls_faced"] >= 20 and breakdown.strike_rate > 150:
+            breakdown.points_strike_rate = 5
+        if breakdown.overs_bowled >= 1.0 and breakdown.economy_rate < 7:
+            breakdown.points_economy = 5
+        breakdown.total_points = (
+            breakdown.points_runs + breakdown.points_wickets
+            + breakdown.points_catches + breakdown.points_run_outs
+            + breakdown.points_strike_rate + breakdown.points_economy
+        )
+        candidates.append(
+            MVPCandidate(
+                player_id=pid, name=data["name"], team_id=data["team_id"],
+                team_role="", total_points=breakdown.total_points,
+                breakdown=breakdown,
+            )
+        )
+    candidates.sort(key=lambda c: c.total_points, reverse=True)
+    return candidates
+
+
+def _get_winning_team_id(db, match_id: int):
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match or match.status != "completed":
+        return None
+    squad_map = {}
+    squads = db.query(MatchSquad).filter(MatchSquad.match_id == match_id).all()
+    for sq in squads:
+        squad_map[sq.player_id] = sq.team_id
+    links = db.query(MatchTeamLink).filter(MatchTeamLink.match_id == match_id).all()
+    team_a_id = team_b_id = None
+    for link in links:
+        if link.team_role == "team_a":
+            team_a_id = link.team_id
+        elif link.team_role == "team_b":
+            team_b_id = link.team_id
+    team_a_runs = team_b_runs = 0
+    for b in db.query(Ball).filter(Ball.match_id == match_id).all():
+        team_id = squad_map.get(b.striker_id)
+        if team_id == team_a_id:
+            team_a_runs += b.runs_batter
+        elif team_id == team_b_id:
+            team_b_runs += b.runs_batter
+    if team_a_runs > team_b_runs:
+        return team_a_id
+    elif team_b_runs > team_a_runs:
+        return team_b_id
+    return None
 
 # ── Module 9: Audit Log Endpoint ──
 @app.get("/audit-log", response_model=None)
@@ -1075,14 +1200,215 @@ from sqlalchemy import select
 
 from app.database import DATABASE_URL
 
-# ── Module 7: Persistence, Export & Import ────────────────────────────────
 
-import os
-import csv
-import io
-import json
-import shutil
-from fastapi.responses import StreamingResponse
+# ── Module 13: MVP Endpoints ──
+
+
+@app.get("/matches/{match_id}/mvp/candidates", response_model=None)
+def get_mvp_candidates(match_id: int, db = Depends(get_db)):
+    """Return ranked list of MVP candidates with points breakdown from delivery log."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    candidates = calculate_mvp_points(db, match_id)
+
+    # Add win bonus to winning team players
+    winning_team_id = _get_winning_team_id(db, match_id)
+    if winning_team_id:
+        for c in candidates:
+            if c.team_id == winning_team_id:
+                c.breakdown.points_win_bonus = 10
+                c.total_points += 10
+        # Re-sort after win bonus
+        candidates.sort(key=lambda c: c.total_points, reverse=True)
+
+    # Fill team_role from match squad/playing xi
+    squad_map = {}
+    squads = db.query(MatchSquad).filter(MatchSquad.match_id == match_id).all()
+    for sq in squads:
+        squad_map[sq.player_id] = sq.team_role
+
+    xi_map = {}
+    xis = db.query(PlayingXI).filter(PlayingXI.match_id == match_id).all()
+    for xi in xis:
+        xi_map[xi.player_id] = {"is_captain": xi.is_captain, "is_wicketkeeper": xi.is_wicketkeeper}
+
+    for c in candidates:
+        c.team_role = squad_map.get(c.player_id, "substitute")
+        if c.player_id in xi_map:
+            if xi_map[c.player_id]["is_captain"]:
+                c.team_role = "captain (" + c.team_role + ")"
+            elif xi_map[c.player_id]["is_wicketkeeper"]:
+                c.team_role = "wicketkeeper (" + c.team_role + ")"
+
+    return {
+        "match_id": match_id,
+        "candidates": [
+            {
+                "player_id": c.player_id,
+                "name": c.name,
+                "team_id": c.team_id,
+                "team_role": c.team_role,
+                "total_points": c.total_points,
+                "breakdown": c.breakdown.model_dump(),
+            }
+            for c in candidates
+        ],
+    }
+
+
+@app.post("/matches/{match_id}/mvp/award", response_model=None)
+def award_mvp(
+    match_id: int,
+    award_data: MvpAwardRequest,
+    db = Depends(get_db),
+    current_session = Depends(get_current_session),
+):
+    """Award MVP to a player. Requires match completed/locked and initiator or scorer rights."""
+    stmt = select(Match).where(Match.id == match_id)
+    result = db.execute(stmt)
+    match = result.scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if match.status not in ("completed", "locked"):
+        raise HTTPException(
+            status_code=400,
+            detail="MVP can only be awarded for completed or locked matches",
+        )
+
+    # Check permissions: initiator or scorer with scoring rights
+    stmt_role = select(MatchRole).where(
+        MatchRole.match_id == match_id, MatchRole.session_id == current_session.session_id
+    )
+    result = db.execute(stmt_role)
+    role = result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=403, detail="Session not registered for this match")
+    if role.role not in ("initiator", "scorer") or not role.scoring_rights:
+        raise HTTPException(
+            status_code=403,
+            detail="Only initiator or scorer with scoring rights can award MVP",
+        )
+
+    # Verify player exists in match squad
+    squad = (
+        db.query(MatchSquad)
+        .filter(MatchSquad.match_id == match_id, MatchSquad.player_id == award_data.player_id)
+        .first()
+    )
+    if not squad:
+        raise HTTPException(status_code=404, detail="Player not in match squad")
+
+    # Check if MVP already awarded
+    existing = db.query(MVP).filter(MVP.match_id == match_id).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"MVP already awarded to player {existing.player_id}",
+        )
+
+    # Award MVP
+    mvp = MVP(
+        match_id=match_id,
+        player_id=award_data.player_id,
+        points=award_data.points,
+        reason_summary=award_data.reason_summary,
+        awarded_by_session_id=current_session.session_id,
+    )
+    db.add(mvp)
+    db.commit()
+    db.refresh(mvp)
+
+    audit_log(
+        db,
+        current_session.session_id,
+        "mvp_awarded",
+        match_id,
+        str(award_data.player_id),
+        '{"player_id": %d, "points": %d, "reason": "%s"}'
+        % (award_data.player_id, award_data.points, award_data.reason_summary or ""),
+    )
+
+    return MVPResponse(
+        id=mvp.id,
+        match_id=mvp.match_id,
+        player_id=mvp.player_id,
+        points=mvp.points,
+        reason_summary=mvp.reason_summary,
+        awarded_by_session_id=mvp.awarded_by_session_id,
+        awarded_at=mvp.awarded_at,
+    )
+
+
+@app.get("/matches/{match_id}/mvp", response_model=None)
+def get_mvp(match_id: int, db = Depends(get_db)):
+    """Return awarded MVP for a match (public)."""
+    mvp = db.query(MVP).filter(MVP.match_id == match_id).first()
+    if not mvp:
+        return {"match_id": match_id, "mvp": None}
+
+    player = db.query(Player).filter(Player.id == mvp.player_id).first()
+    return {
+        "match_id": match_id,
+        "mvp": {
+            "id": mvp.id,
+            "player_id": mvp.player_id,
+            "player_name": player.name if player else f"Player {mvp.player_id}",
+            "points": mvp.points,
+            "reason_summary": mvp.reason_summary,
+            "awarded_by_session_id": mvp.awarded_by_session_id,
+            "awarded_at": mvp.awarded_at.isoformat() if mvp.awarded_at else None,
+        },
+    }
+
+# ── Module 9.7: Auto-close Inactive Matches ──────────────────────────────────
+
+def auto_close_inactive_matches(db, hours: int = 24):
+    """Close matches that have been `in_progress` for more than `hours` hours.
+
+    Sets status to `completed`, locks the match, and creates an audit log entry.
+    Returns the number of matches closed.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    inactive = (
+        db.query(Match)
+        .filter(Match.status == "in_progress")
+        .filter(Match.updated_at < cutoff)
+        .all()
+    )
+    closed_count = 0
+    for match in inactive:
+        match.status = "completed"
+        match.locked_at = datetime.now(timezone.utc)
+        match.updated_at = datetime.now(timezone.utc)
+        audit_log(
+            db,
+            "system",
+            "auto_closed_inactive",
+            match.id,
+            str(match.id),
+            '{"reason": "no_activity", "hours": %d}' % hours,
+        )
+        closed_count += 1
+    db.commit()
+    return closed_count
+
+
+@app.post("/matches/auto-close-inactive", response_model=None)
+def auto_close_inactive_endpoint(hours: int = 24, db = Depends(get_db)):
+    """Manually trigger auto-close of inactive matches (for cron/scheduler use)."""
+    closed_count = auto_close_inactive_matches(db, hours=hours)
+    return {
+        "closed": closed_count,
+        "message": f"{closed_count} inactive match(es) closed",
+    }
+
+
+# ── Module 7: Persistence, Export & Import ────────────────────────────────
 
 
 def _get_db_path():

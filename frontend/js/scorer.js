@@ -241,6 +241,36 @@
     });
   }
 
+  async function fetchMVP() {
+    try {
+      const response = await fetch(API_BASE + "/matches/" + matchId + "/mvp");
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.mvp) {
+        displayMVP(data.mvp);
+      }
+    } catch (e) {
+      console.error("MVP fetch failed:", e);
+    }
+  }
+
+  function displayMVP(mvp) {
+    const section = document.getElementById("mvp-section");
+    const content = document.getElementById("mvp-content");
+    if (!section || !content) return;
+
+    section.classList.remove("hidden");
+
+    let html = "";
+    html += "<p><strong>MVP:</strong> " + mvp.player_name + "</p>";
+    html += "<p><strong>Points:</strong> " + mvp.points + "</p>";
+    if (mvp.reason_summary) {
+      html += "<p><strong>Reason:</strong> " + mvp.reason_summary + "</p>";
+    }
+    html += "<p><strong>Awarded:</strong> " + (mvp.awarded_at || "—") + "</p>";
+    content.innerHTML = html;
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
     matchId = params.get("match_id") || window.location.pathname.split("/").pop();
@@ -249,6 +279,7 @@
       return;
     }
     fetchData();
+    fetchMVP();
     updateOfflineBadge();
   });
 })();

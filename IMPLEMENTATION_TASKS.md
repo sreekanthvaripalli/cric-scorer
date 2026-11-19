@@ -254,20 +254,20 @@
 **Dependencies:** Modules 2, 4, 6
 **Deliverable:** Auto-ranked MVP candidates + initiator-awarded MVP displayed on scorecard
 
-- [ ] 13.1 MVP model: id, match_id, player_id, points, reason_summary, awarded_by_session_id, awarded_at
+- [x] 13.1 MVP model: id, match_id, player_id, points, reason_summary, awarded_by_session_id, awarded_at
   > Done when: Model + migration
-- [ ] 13.2 Points algorithm: runs scored, wickets taken, catches, run-outs, strike-rate, economy rate, bonus for winning match / player of match qualities
+- [x] 13.2 Points algorithm: runs scored, wickets taken, catches, run-outs, strike-rate, economy rate, bonus for winning match / player of match qualities
   > Done when: Formula documented and implemented
-- [ ] 13.3 GET /matches/{id}/mvp/candidates — returns ranked list of players with points breakdown from delivery log
+- [x] 13.3 GET /matches/{id}/mvp/candidates — returns ranked list of players with points breakdown from delivery log
   > Done when: Candidates auto-computed from match data
-- [ ] 13.4 POST /matches/{id}/mvp/award — initiator or scorer awards MVP to a player; requires match completed/locked
+- [x] 13.4 POST /matches/{id}/mvp/award — initiator or scorer awards MVP to a player; requires match completed/locked
   > Done when: MVP awarded and stored
-- [ ] 13.5 GET /matches/{id}/mvp — public, returns awarded MVP player with points and reason
+- [x] 13.5 GET /matches/{id}/mvp — public, returns awarded MVP player with points and reason
   > Done when: MVP visible on scorecard/watch page
-- [ ] 13.6 UI: MVP section on scorecard **for this match** showing winner, points, and key stats (runs, wickets, catches, etc.)
+- [x] 13.6 UI: MVP section on scorecard **for this match** showing winner, points, and key stats (runs, wickets, catches, etc.)
   > Done when: MVP displayed in frontend; stats are per-match only (career aggregates are Phase 4)
 
-- [ ] 9.7 Auto-close inactive matches: Background process/check that sets matches with status `in_progress` for more than 24 hours to `completed` with result `No Result`; creates audit log entry; match remains viewable but locked
+- [x] 9.7 Auto-close inactive matches: Background process/check that sets matches with status `in_progress` for more than 24 hours to `completed` with result `No Result`; creates audit log entry; match remains viewable but locked
 
 ---
 

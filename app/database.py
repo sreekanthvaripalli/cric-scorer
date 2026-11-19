@@ -340,3 +340,25 @@ class AuditLog(Base):
         nullable=False,
     )
     details = Column(Text, nullable=True)
+
+
+class MVP(Base):
+    """Most Valuable Player award for a match.
+
+    Records which player was awarded MVP for a match,
+    along with points breakdown and who awarded it.
+    """
+
+    __tablename__ = "mvp"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False, index=True)  # match this MVP belongs to
+    player_id = Column(Integer, nullable=False)  # player_id of MVP winner
+    points = Column(Integer, nullable=False, default=0)  # total points scored
+    reason_summary = Column(Text, nullable=True)  # human-readable reason
+    awarded_by_session_id = Column(String(36), nullable=False)  # session that awarded
+    awarded_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )

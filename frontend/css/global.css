@@ -225,3 +225,25 @@ body {
     color: #999;
     font-size: 0.85rem;
 }
+
+/* MVP Section Styles */
+.mvp-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fffaf0;
+    border-left: 4px solid #ffd700;
+}
+
+.mvp-section.hidden {
+    display: none;
+}
+
+.mvp-section h2 {
+    color: #b8860b;
+    margin-top: 0;
+}
+
+.mvp-section p {
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
+}
