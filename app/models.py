@@ -349,6 +349,8 @@ class BallRecordRequest(BaseModel):
     non_striker_id: int = Field(..., description="Player ID of the non-striker")
     runs_batter: int = Field(0, ge=0, le=6, description="Runs scored by batter (0-6)")
     runs_extras: int = Field(0, ge=0, description="Extras scored")
+    over_number: int = Field(..., ge=1, description="Over number (1-based)")
+    ball_number: int = Field(..., ge=1, le=6, description="Ball number within over (1-6)")
     extra_type: Optional[str] = Field(None, description="nb / wd / bye / legbye / penalty")
     penalty_runs: int = Field(0, ge=0, description="Penalty runs (separate from extras)")
     is_wicket: bool = Field(False, description="Whether a wicket fell")
@@ -357,7 +359,7 @@ class BallRecordRequest(BaseModel):
     short_runs: int = Field(0, ge=0, description="Short run penalty (leg-bye style)")
     boundary_type: Optional[str] = Field(None, description="4 / 6 / None")
     is_free_hit: bool = Field(False, description="Free hit after no ball")
-
+    is_valid_ball: bool = Field(True, description="Whether this counts as a valid ball")
 
 class BallRecordResponse(BaseModel):
     """Response model for a recorded delivery."""

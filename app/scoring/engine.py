@@ -97,7 +97,7 @@ def process_ball(
         ball_number=request.ball_number,
         striker_id=request.striker_id,
         non_striker_id=request.non_striker_id,
-        bowler_id=request.striker_id,
+        bowler_id=request.bowler_id,
         runs_batter=request.runs_batter,
         runs_extras=request.runs_extras,
         extra_type=request.extra_type,

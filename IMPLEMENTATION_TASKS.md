@@ -276,17 +276,17 @@
 **Dependencies:** All previous modules
 **Deliverable:** Test suite; release-ready quality
 
-- [ ] 10.1 Unit tests: dismissal mode x (normal / No ball / Wide / free-hit) matrix; extras types; short-run rules; boundary greater-of; over-counting with NB/WD; max overs/bowler; consecutive-over prevention
+- [x] 10.1 Unit tests: dismissal mode x (normal / No ball / Wide / free-hit) matrix; extras types; short-run rules; boundary greater-of; over-counting with NB/WD; max overs/bowler; consecutive-over prevention
   > Done when: >=200 test cases
-- [ ] 10.2 Integration test: full flow - create match -> request scoring -> initiator approves -> score live -> watcher sees updates -> result -> lock
+- [x] 10.2 Integration test: full flow - create match -> request scoring -> initiator approves -> score live -> watcher sees updates -> result -> lock
   > Done when: End-to-end passes
-- [ ] 10.3 Live sync test: two WS clients, broadcast consistency after each delivery
+- [x] 10.3 Live sync test: two WS clients, broadcast consistency after each delivery
   > Done when: No drift
-- [ ] 10.4 Offline test: score entirely offline, close browser, reopen, data intact, sync on reconnect
+- [x] 10.4 Offline test: score entirely offline, close browser, reopen, data intact, sync on reconnect
   > Done when: Offline round-trip works
-- [ ] 10.5 Export/import round-trip: JSON preserves every delivery exactly
+- [x] 10.5 Export/import round-trip: JSON preserves every delivery exactly
   > Done when: Import matches export
-- [ ] 10.6 Coverage target: 100% of scoring engine lines; any scoring bug = release blocker
+- [x] 10.6 Coverage target: 100% of scoring engine lines; any scoring bug = release blocker
   > Done when: Coverage report green
 
 ---
