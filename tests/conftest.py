@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from app.database import Base, engine as app_engine, session_local as app_session_local  # noqa: E402
-from app.main import app  # noqa: E402
+from app.main import app, get_db, reset_rate_limits  # noqa: E402
 
 
 # Override the app engine with a test in-memory engine
@@ -34,6 +34,7 @@ def get_test_session_local():
 
 # Create all tables
 Base.metadata.create_all(bind=test_engine)
+Base.metadata.create_all(bind=app_engine)
 
 
 @pytest.fixture(scope="function")
@@ -46,20 +47,27 @@ def db_session():
     yield session
 
     session.close()
-    transaction.rollback()
+    if transaction.is_active:
+        transaction.rollback()
     connection.close()
 
 
 @pytest.fixture(scope="function")
 def client(db_session):
     """Create a TestClient with overridden database session."""
-    def override_get_session_local():
-        return get_test_session_local
+    reset_rate_limits()
 
-    app.dependency_overrides = {}
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()
+    reset_rate_limits()
 
 
 @pytest.fixture

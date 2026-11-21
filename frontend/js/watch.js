@@ -88,32 +88,36 @@
     item.className = "ball-item";
     let runsText = "";
     if (ball.runs_batter > 0) {
-      runsText += "Runs: <span class="ball-runes">+" + ball.runs_batter + "</span>";
+      runsText += 'Runs: <span class="ball-runs">+' + ball.runs_batter + '</span>';
     }
     if (ball.extra_type) {
       const map = { nb: "No ball", wd: "Wide", bye: "Bye", legbye: "Leg bye", penalty: "Penalty" };
-      runsText += " | <span class="ball-decision">" + map[ball.extra_type] + "</span>";
+      runsText += ' | <span class="ball-decision">' + (map[ball.extra_type] || ball.extra_type) + '</span>';
     }
     if (ball.boundary_type) {
-      runsText += " | <span class="ball-runes">Boundary " + ball.boundary_type + "</span>";
+      runsText += ' | <span class="ball-runs">Boundary ' + ball.boundary_type + '</span>';
     }
     if (ball.is_wicket) {
-      runsText += " | <span class="ball-wicket">" + (ball.dismissal_mode || "out") + "</span>";
+      runsText += ' | <span class="ball-wicket">' + (ball.dismissal_mode || "out") + '</span>';
     }
     item.innerHTML =
-      "<div class="ball-time">" + new Date().toLocaleTimeString() + "</div>" +
-      "<div class="ball-side">" + ball.striker_id + " (" + (ball.boundary_type ? "c." : "·") + ")</div>" +
-      "<div class="ball-runes">" + runsText + "</div>";
+      '<div class="ball-time">' + new Date().toLocaleTimeString() + '</div>' +
+      '<div class="ball-side">' + ball.striker_id + ' (' + (ball.boundary_type ? 'c.' : '·') + ')</div>' +
+      '<div class="ball-runs">' + runsText + '</div>';
     const list = document.getElementById("ball-feed");
-    list.insertBefore(item, list.firstChild);
-    while (list.children.length > 10) list.removeChild(list.lastChild);
+    if (list) {
+      list.insertBefore(item, list.firstChild);
+      while (list.children.length > 10) list.removeChild(list.lastChild);
+    }
   }
 
   function updateTossDisplay(toss) {
-    tossContent.innerHTML =
-      "<p>Winner: " + (toss.winner_team_id === 1 ? "Team A" : "Team B") + "</p>" +
-      "<p>Result: " + toss.coin_result + "</p>" +
-      "<p>Decision: " + (toss.toss_decision || "Pending") + "</p>";
+    if (tossContent) {
+      tossContent.innerHTML =
+        "<p>Winner: " + (toss.winner_team_id === 1 ? "Team A" : "Team B") + "</p>" +
+        "<p>Result: " + toss.coin_result + "</p>" +
+        "<p>Decision: " + (toss.toss_decision || "Pending") + "</p>";
+    }
   }
 
   function updatePresence(isConnected, count) {

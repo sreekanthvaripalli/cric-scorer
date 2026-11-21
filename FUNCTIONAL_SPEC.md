@@ -332,4 +332,30 @@ Any change to the presumptions in Section 2 requires:
 
 ---
 
+## 11. Known Implementation Gaps (v1)
+
+The following requirements from Section 4 are partially implemented or pending completion:
+
+| FR | Requirement | Implementation Gap | Status |
+|----|-------------|-------------------|--------|
+| FR-4.10 | Short runs: deliberate vs unintentional (5-run penalty to fielding side) | `deliberate_short_run` field and engine penalty logic added; no dedicated UI control for marking deliberate short runs | **Partially implemented** |
+| FR-6.5 | Result types: Draw / Conceded / Awarded / Penalty runs | Match model has result columns; `compute_match_result` returns manually-set results; no API endpoint exists to set a manual result type on a match | **Partially implemented** |
+| FR-6.6 | Law 16.6 Winning-hit rule | Detected in `compute_match_result`; annotated in margin text when the final ball is both a wicket and a winning hit | **Implemented** |
+| FR-7.4 | MVP award only after match completed/locked | Guard added to `POST /matches/{id}/mvp/award` | **Implemented** |
+| FR-8.6 | Auto-backup before major mutations | `_backup_db()` called before `record_ball`, `confirm_scores`, and `lock_match_endpoint` | **Implemented** |
+| FR-9.3 | Match ID display + shareable link | Added to `frontend/index.html` with copy-to-clipboard button | **Implemented** |
+| FR-9.6 | Request/approve scoring rights UI | Added to `frontend/index.html` (initiator sees pending requests; non-initiator can request) | **Implemented** |
+| FR-10.2 | Admin unlock endpoint (with audit) | Added `POST /matches/{id}/unlock` (initiator-only, audit logged) | **Implemented** |
+| FR-5.1 | WebSocket broadcast on match status changes | Broadcasts added on match completed, locked, unlocked, and toss complete | **Implemented** |
+
+### Data Model Notes (Section 6)
+
+The `Innings`, `Over`, `Wicket`, and `ScoreSnapshot` tables exist in `app/database.py` but are not fully populated:
+- `Innings` rows are created on first ball of each innings
+- `Over` rows are created on over completion
+- `Wicket` rows are created when a wicket falls
+- `ScoreSnapshot` rows are not yet generated (point-in-time snapshots for audit/recovery)
+
+---
+
 *End of Functional Specification.*

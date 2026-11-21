@@ -1,7 +1,7 @@
-/"
+/**
  * Cric-Scorer — Scorer Controller
  * Offline-first scoring UI with IndexedDB queue
- "/
+ */
 
 (function () {
   "use strict";
@@ -11,6 +11,13 @@
   let matchData = null;
   let offlineQueue = [];
   let isConnected = true;
+
+  // Scoring state
+  let currentOver = 1;
+  let currentBall = 1;
+  let strikerId = 1;
+  let nonStrikerId = 2;
+  let bowlerId = 3;
 
   const matchName = document.getElementById("match-name");
   const matchStatus = document.getElementById("match-status");
@@ -46,11 +53,13 @@
   ];
 
   numberButtons.forEach((btn) => {
-    btn.id.addEventListener("click", () => recordDelivery(btn.value));
+    if (btn.id) {
+      btn.id.addEventListener("click", () => recordDelivery(btn.value));
+    }
   });
 
-  btnUndo.addEventListener("click", undoLastBall);
-  btnOverComplete.addEventListener("click", completeOver);
+  if (btnUndo) btnUndo.addEventListener("click", undoLastBall);
+  if (btnOverComplete) btnOverComplete.addEventListener("click", completeOver);
 
   async function fetchData() {
     try {
@@ -66,19 +75,40 @@
   }
 
   function updateMatchInfo() {
-    matchName.textContent = matchData.name;
-    matchStatus.textContent = matchData.status;
-    teamA.textContent = matchData.team_a_name;
-    teamB.textContent = matchData.team_b_name;
-    scoreDisplay.textContent = matchData.team_a_name + " vs " + matchData.team_b_name;
+    if (matchName) matchName.textContent = matchData.name || "";
+    if (matchStatus) matchStatus.textContent = matchData.status || "";
+    if (teamA) teamA.textContent = matchData.team_a_name || "";
+    if (teamB) teamB.textContent = matchData.team_b_name || "";
+    if (scoreDisplay) scoreDisplay.textContent = (matchData.team_a_name || "") + " vs " + (matchData.team_b_name || "");
   }
 
   async function recordDelivery(value) {
     if (!matchId) return;
+    const isWicket = value === "wicket";
+    const isNb = value === "nb";
+    const isWd = value === "wd";
+    const isBye = value === "bye";
+
     const delivery = {
       match_id: matchId,
-      data: { delivery_type: value },
-      queued_at: new Date().toISOString()
+      bowler_id: bowlerId,
+      striker_id: strikerId,
+      non_striker_id: nonStrikerId,
+      over_number: currentOver,
+      ball_number: currentBall,
+      runs_batter: isWicket ? 0 : (typeof value === "number" ? value : 0),
+      runs_extras: 0,
+      extra_type: isNb ? "nb" : isWd ? "wd" : isBye ? "bye" : null,
+      penalty_runs: 0,
+      is_wicket: isWicket,
+      dismissal_mode: isWicket ? "caught" : null,
+      fielder_id: isWicket ? bowlerId : null,
+      short_runs: 0,
+      boundary_type: typeof value === "number" && (value === 4 || value === 6) ? String(value) : null,
+      is_free_hit: false,
+      is_valid_ball: !isNb && !isWd,
+      delivery_type: value,
+      queued_at: new Date().toISOString(),
     };
     offlineQueue.push(delivery);
     await saveToIndexedDB(delivery);
@@ -87,6 +117,16 @@
       await sendDelivery(delivery);
       offlineQueue = offlineQueue.filter(d => d.id !== delivery.id);
       updateOfflineBadge();
+      // Advance ball state
+      currentBall++;
+      if (currentBall > 6) {
+        currentBall = 1;
+        currentOver++;
+      }
+      // Rotate strike on odd runs
+      if (typeof value === "number" && value % 2 === 1) {
+        [strikerId, nonStrikerId] = [nonStrikerId, strikerId];
+      }
     }
   }
 
@@ -95,9 +135,27 @@
       const response = await fetch(API_BASE + "/matches/" + matchId + "/balls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ delivery_type: delivery.data.delivery_type })
+        body: JSON.stringify({
+          bowler_id: delivery.bowler_id,
+          striker_id: delivery.striker_id,
+          non_striker_id: delivery.non_striker_id,
+          over_number: delivery.over_number,
+          ball_number: delivery.ball_number,
+          runs_batter: delivery.runs_batter,
+          runs_extras: delivery.runs_extras,
+          extra_type: delivery.extra_type,
+          penalty_runs: delivery.penalty_runs,
+          is_wicket: delivery.is_wicket,
+          dismissal_mode: delivery.dismissal_mode,
+          fielder_id: delivery.fielder_id,
+          short_runs: delivery.short_runs,
+          boundary_type: delivery.boundary_type,
+          is_free_hit: delivery.is_free_hit,
+          is_valid_ball: delivery.is_valid_ball,
+          delivery_type: delivery.delivery_type,
+        }),
       });
-      if (!response.ok) throw new Error("Server error");
+      if (!response.ok) throw new Error("Server error: " + response.status);
       showStatus("Delivery recorded", "success");
     } catch (error) {
       showStatus("Failed: " + error.message, "error");
@@ -172,8 +230,10 @@
   }
 
   function updateOfflineBadge() {
-    offlineBadge.textContent = offlineQueue.length;
-    offlineBadge.style.display = offlineQueue.length > 0 ? "block" : "none";
+    if (offlineBadge) {
+      offlineBadge.textContent = offlineQueue.length;
+      offlineBadge.style.display = offlineQueue.length > 0 ? "block" : "none";
+    }
   }
 
   function showStatus(message, type) {

@@ -67,6 +67,10 @@
             ws.onclose = onWebSocketClose;
             ws.onerror = onWebSocketError;
         } else {
+            fallbackToPolling();
+        }
+    }
+
     function onWebSocketOpen() {
         console.log('WebSocket connected');
         updatePresence(true);
@@ -225,6 +229,3 @@
         connectWebSocket();
     });
 })();
-            fallbackToPolling();
-        }
-    }

@@ -115,13 +115,15 @@ def test_concurrent_ball_records(db_session):
     striker = Player(team_id=1, name="Striker", role="batsman", jersey_number=1)
     non_striker = Player(team_id=1, name="NonStriker", role="batsman", jersey_number=2)
     bowler = Player(team_id=2, name="Bowler", role="bowler", jersey_number=3)
-    db_session.add_all([striker, non_striker, bowler])
+    bowler2 = Player(team_id=2, name="Bowler2", role="bowler", jersey_number=4)
+    db_session.add_all([striker, non_striker, bowler, bowler2])
     db_session.commit()
     db_session.refresh(striker)
     db_session.refresh(non_striker)
     db_session.refresh(bowler)
+    db_session.refresh(bowler2)
 
-    for p in [striker, non_striker, bowler]:
+    for p in [striker, non_striker, bowler, bowler2]:
         squad = MatchSquad(match_id=match.id, player_id=p.id, team_id=p.team_id, is_substitute=False)
         db_session.add(squad)
     db_session.commit()
@@ -137,13 +139,14 @@ def test_concurrent_ball_records(db_session):
     db_session.commit()
 
     def record_ball(over, ball, runs):
+        b_id = bowler.id if over % 2 == 1 else bowler2.id
         req = BallRecordRequest(
             session_id="test_session",
             over_number=over,
             ball_number=ball,
             striker_id=striker.id,
             non_striker_id=non_striker.id,
-            bowler_id=bowler.id,
+            bowler_id=b_id,
             runs_batter=runs,
         )
         resp = process_ball(db_session, match, req, role, innings_id=1, is_first_ball_of_match=(over == 1 and ball == 1))

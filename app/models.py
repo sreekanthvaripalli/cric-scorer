@@ -35,7 +35,7 @@ class MatchCreate(BaseModel):
     team_b_name: str = Field(..., max_length=150, description="Second team name")
     format: str = Field("Custom", max_length=20, description="Match format: T20, ODI, Test, Custom")
     overs_per_innings: int = Field(
-        20, ge=5, le=500, description="Overs per innings (initiator decides)"
+        20, ge=1, le=500, description="Overs per innings (initiator decides)"
     )
     balls_per_over: int = Field(
         6, ge=1, le=10, description="Balls per over"
@@ -357,9 +357,11 @@ class BallRecordRequest(BaseModel):
     dismissal_mode: Optional[str] = Field(None, description="Bowled / caught / lbw / run_out / stumped / etc.")
     fielder_id: Optional[int] = Field(None, description="Player ID of the fielder")
     short_runs: int = Field(0, ge=0, description="Short run penalty (leg-bye style)")
+    deliberate_short_run: bool = Field(False, description="Whether short runs were deliberate (5-run penalty to fielding side)")
     boundary_type: Optional[str] = Field(None, description="4 / 6 / None")
     is_free_hit: bool = Field(False, description="Free hit after no ball")
     is_valid_ball: bool = Field(True, description="Whether this counts as a valid ball")
+    delivery_type: Optional[str] = Field(None, description="Optional shorthand delivery type from UI (e.g. 0-6, nb, wd, bye, wicket)")
 
 class BallRecordResponse(BaseModel):
     """Response model for a recorded delivery."""

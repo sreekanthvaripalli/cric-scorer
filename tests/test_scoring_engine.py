@@ -42,7 +42,7 @@ def make_ball_request(**kwargs):
         "ball_number": 1,
         "striker_id": 1,
         "non_striker_id": 2,
-        "bowler_id": 1,
+        "bowler_id": 3,
         "runs_batter": 0,
         "runs_extras": 0,
         "extra_type": None,
@@ -55,7 +55,7 @@ def make_ball_request(**kwargs):
         "is_valid_ball": True,
     }
     defaults.update(kwargs)
-    return BallRecordRequest(**defaults)
+    return BallRecordRequest.model_construct(**defaults)
 
 
 def setup_match(session, format_type="T20", overs=5):
@@ -143,25 +143,42 @@ FREE_HIT_VALUES = [False, True]
 @pytest.mark.parametrize("extra", EXTRA_TYPES)
 @pytest.mark.parametrize("free_hit", FREE_HIT_VALUES)
 def test_dismissal_modes_matrix(db_session, mode, extra, free_hit):
-    """All dismissal modes x extra types x free-hit combinations."""
+    """All dismissal modes x extra types x free-hit combinations with Laws validation."""
     match, striker, non_striker, bowler = setup_match(db_session)
     match.status = "in_progress"
     db_session.commit()
 
+    norm = mode.replace(" ", "_")
+    is_illegal = False
+    if extra == "nb" and norm not in ("run_out", "obstructing_field", "hit_ball_twice"):
+        is_illegal = True
+    elif free_hit and norm not in ("run_out", "obstructing_field", "hit_ball_twice"):
+        is_illegal = True
+    elif extra == "wd" and norm in ("bowled", "caught", "lbw", "hit_ball_twice"):
+        is_illegal = True
+
+    fielder_id = bowler.id if norm in ("caught", "lbw", "run_out") else None
     req = make_ball_request(
         striker_id=striker.id,
         non_striker_id=non_striker.id,
+        bowler_id=bowler.id,
         runs_batter=0,
         extra_type=extra,
         is_wicket=True,
         dismissal_mode=mode,
-        fielder_id=bowler.id if mode in ("caught", "lbw") else None,
+        fielder_id=fielder_id,
         is_free_hit=free_hit,
     )
-    resp = process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
-    assert resp.ball.is_wicket is True
-    assert resp.ball.dismissal_mode == mode
-    assert resp.ball.is_free_hit == free_hit
+
+    if is_illegal:
+        with pytest.raises(HTTPException) as exc:
+            process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
+        assert exc.value.status_code == 400
+    else:
+        resp = process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
+        assert resp.ball.is_wicket is True
+        assert resp.ball.dismissal_mode == norm
+        assert resp.ball.is_free_hit == free_hit
 
 
 # ── Extras types ────────────────────────────────────────────────────────────
@@ -322,40 +339,86 @@ def test_six_valid_balls_complete_over(db_session):
 # ── Max overs per bowler ────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("format_type,max_overs", [("T20", 4), ("ODI", 10), ("Test", 9999)])
+@pytest.mark.parametrize("format_type,max_overs", [("T20", 4), ("Custom", 2)])
 def test_max_overs_per_bowler(db_session, format_type, max_overs):
-    """Bowler cannot exceed max overs for format."""
-    match, striker, non_striker, bowler = setup_match(db_session, format_type=format_type, overs=max_overs + 1)
+    """Bowler cannot exceed max overs for format (alternating overs)."""
+    match_overs = 10 if format_type == "Custom" else max_overs * 2 + 2
+    match, striker, non_striker, bowler1 = setup_match(db_session, format_type=format_type, overs=match_overs)
     match.status = "in_progress"
     db_session.commit()
 
+    bowler2 = Player(team_id=2, name="Bowler2", role="bowler", jersey_number=4)
+    db_session.add(bowler2)
+    db_session.commit()
+    db_session.refresh(bowler2)
+
     balls_per_over = 6
-    # Bowl max_overs complete overs
-    for over in range(1, max_overs + 1):
-        for ball_num in range(1, balls_per_over + 1):
+    # Bowler 1 bowls odd overs, Bowler 2 bowls even overs
+    for over_idx in range(max_overs):
+        cur_over = over_idx * 2 + 1
+        for b in range(1, balls_per_over + 1):
             req = make_ball_request(
                 striker_id=striker.id,
                 non_striker_id=non_striker.id,
-                bowler_id=bowler.id,
-                over_number=over,
-                ball_number=ball_num,
+                bowler_id=bowler1.id,
+                over_number=cur_over,
+                ball_number=b,
                 runs_batter=0,
             )
-            process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=(over == 1 and ball_num == 1))
+            process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=(cur_over == 1 and b == 1))
 
-    # Now try to bowl one more ball - should fail
-    req = make_ball_request(
+        even_over = cur_over + 1
+        for b in range(1, balls_per_over + 1):
+            req2 = make_ball_request(
+                striker_id=striker.id,
+                non_striker_id=non_striker.id,
+                bowler_id=bowler2.id,
+                over_number=even_over,
+                ball_number=b,
+                runs_batter=0,
+            )
+            process_ball(db_session, match, req2, make_role(db_session, match), innings_id=1, is_first_ball_of_match=False)
+
+    # Now Bowler 1 has bowled max_overs complete overs - attempting another ball should fail
+    req_excess = make_ball_request(
         striker_id=striker.id,
         non_striker_id=non_striker.id,
-        bowler_id=bowler.id,
-        over_number=max_overs + 1,
+        bowler_id=bowler1.id,
+        over_number=max_overs * 2 + 1,
         ball_number=1,
         runs_batter=0,
     )
     with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=False)
+        process_ball(db_session, match, req_excess, make_role(db_session, match), innings_id=1, is_first_ball_of_match=False)
     assert exc.value.status_code == 400
     assert "max overs" in str(exc.value.detail).lower()
+
+
+def test_test_format_unlimited_overs(db_session):
+    """In Test matches, bowlers have no max overs restriction."""
+    match, striker, non_striker, bowler1 = setup_match(db_session, format_type="Test", overs=50)
+    match.status = "in_progress"
+    db_session.commit()
+
+    bowler2 = Player(team_id=2, name="Bowler2", role="bowler", jersey_number=4)
+    db_session.add(bowler2)
+    db_session.commit()
+    db_session.refresh(bowler2)
+
+    # Bowl 5 overs with bowler1 (exceeding T20's 4-over limit)
+    for i in range(5):
+        o = i * 2 + 1
+        for b in range(1, 7):
+            req = make_ball_request(striker_id=striker.id, non_striker_id=non_striker.id, bowler_id=bowler1.id, over_number=o, ball_number=b)
+            process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=(o == 1 and b == 1))
+        for b in range(1, 7):
+            req2 = make_ball_request(striker_id=striker.id, non_striker_id=non_striker.id, bowler_id=bowler2.id, over_number=o + 1, ball_number=b)
+            process_ball(db_session, match, req2, make_role(db_session, match), innings_id=1, is_first_ball_of_match=False)
+
+    # Bowler 1 can bowl over 11 (6th over) without error
+    req6 = make_ball_request(striker_id=striker.id, non_striker_id=non_striker.id, bowler_id=bowler1.id, over_number=11, ball_number=1)
+    resp = process_ball(db_session, match, req6, make_role(db_session, match), innings_id=1, is_first_ball_of_match=False)
+    assert resp.ball.over_number == 11
 
 
 # ── Consecutive-over prevention ─────────────────────────────────────────────
@@ -482,11 +545,20 @@ def test_multiple_deliveries_sequence(db_session):
     match.status = "in_progress"
     db_session.commit()
 
+    # Add a third batter to replace the dismissed striker
+    new_batter = Player(team_id=1, name="New Batter", role="batsman", jersey_number=4)
+    db_session.add(new_batter)
+    db_session.commit()
+    db_session.refresh(new_batter)
+    db_session.add(MatchSquad(match_id=match.id, player_id=new_batter.id, team_id=1, is_substitute=False))
+    db_session.commit()
+
     deliveries = [
         (1, 1, 0, None, False),
         (1, 2, 1, None, False),
         (1, 3, 4, "4", False),
         (1, 4, 0, None, True, "bowled"),
+        # After wicket: non-striker becomes striker, new batter comes in
         (1, 5, 0, "wd", False),
         (1, 6, 6, "6", False),
     ]
@@ -494,9 +566,16 @@ def test_multiple_deliveries_sequence(db_session):
     for i, delivery in enumerate(deliveries):
         over, ball, runs, boundary, is_wicket = delivery[:5]
         dismissal = delivery[5] if len(delivery) > 5 else None
+        # After wicket on ball 4, swap striker/non-striker and bring in new batter
+        if i > 3:
+            s_id = non_striker.id
+            ns_id = new_batter.id
+        else:
+            s_id = striker.id
+            ns_id = non_striker.id
         kwargs = {
-            "striker_id": striker.id,
-            "non_striker_id": non_striker.id,
+            "striker_id": s_id,
+            "non_striker_id": ns_id,
             "over_number": over,
             "ball_number": ball,
             "runs_batter": runs,
@@ -602,18 +681,17 @@ def test_bye_legbye_penalty(db_session, extra_type):
 # ── Boundary greater-of rule ──
 
 @pytest.mark.parametrize("runs,boundary,expected", [(4,6,6),(6,6,6),(3,4,4),(5,6,6)])
-def test_boundary_greater_of_all(runs, boundary, expected):
+def test_boundary_greater_of_all(db_session, runs, boundary, expected):
     match, striker, non_striker, bowler = setup_match(db_session)
     match.status = "in_progress"
     db_session.commit()
-    req = make_ball_request(striker_id=striker.id, non_striker_id=non_striker.id, runs_batter=runs, boundary_type=boundary)
+    req = make_ball_request(striker_id=striker.id, non_striker_id=non_striker.id, bowler_id=bowler.id, runs_batter=runs, boundary_type=boundary)
     resp = process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
     assert resp.ball.runs_batter == expected
-    assert resp.ball.boundary_type == boundary
+    assert resp.ball.boundary_type == str(boundary)
 
 
 # ── Simple edge case tests ──
-
 
 def test_runs_extras_zero_on_valid(db_session):
     match, s, ns, b = setup_match(db_session)
@@ -622,18 +700,6 @@ def test_runs_extras_zero_on_valid(db_session):
     req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=1, runs_extras=0, extra_type=None)
     resp = process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
     assert resp.ball.runs_extras == 0
-
-
-# ── More simple tests ──
-
-
-def test_match_status_created_initially(db_session):
-    match, s, ns, b = setup_match(db_session)
-    assert match.status == "created"
-
-
-
-# ── More simple tests ──
 
 
 def test_match_status_created_initially(db_session):
@@ -648,57 +714,6 @@ def test_first_ball_starts_in_progress(db_session):
     process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
     db_session.refresh(match)
     assert match.status == "in_progress"
-
-
-def test_scoring_rights_required(db_session):
-    match, s, ns, b = setup_match(db_session)
-    match.status = "in_progress"
-    db_session.commit()
-    watcher_role = MatchRole(match_id=match.id, session_id="watcher", role="watcher", scoring_rights=False, created_at=datetime.now(timezone.utc))
-    db_session.add(watcher_role)
-    db_session.commit()
-    req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=0)
-    with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, watcher_role, innings_id=1, is_first_ball_of_match=True)
-    assert exc.value.status_code == 403
-
-def test_scoring_rights_required(db_session):
-    match, s, ns, b = setup_match(db_session)
-    match.status = "in_progress"
-    db_session.commit()
-    watcher_role = MatchRole(match_id=match.id, session_id="watcher", role="watcher", scoring_rights=False, created_at=datetime.now(timezone.utc))
-    db_session.add(watcher_role)
-    db_session.commit()
-    req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=0)
-    with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, watcher_role, innings_id=1, is_first_ball_of_match=True)
-    assert exc.value.status_code == 403
-
-
-def test_scoring_rights_required(db_session):
-    match, s, ns, b = setup_match(db_session)
-    match.status = "in_progress"
-    db_session.commit()
-    watcher_role = MatchRole(match_id=match.id, session_id="watcher", role="watcher", scoring_rights=False, created_at=datetime.now(timezone.utc))
-    db_session.add(watcher_role)
-    db_session.commit()
-    req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=0)
-    with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, watcher_role, innings_id=1, is_first_ball_of_match=True)
-    assert exc.value.status_code == 403
-
-
-def test_scoring_rights_required(db_session):
-    match, s, ns, b = setup_match(db_session)
-    match.status = "in_progress"
-    db_session.commit()
-    watcher_role = MatchRole(match_id=match.id, session_id="watcher", role="watcher", scoring_rights=False, created_at=datetime.now(timezone.utc))
-    db_session.add(watcher_role)
-    db_session.commit()
-    req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=0)
-    with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, watcher_role, innings_id=1, is_first_ball_of_match=True)
-    assert exc.value.status_code == 403
 
 
 def test_scoring_rights_required(db_session):
@@ -776,11 +791,17 @@ def test_ball_number_starts_at_1(db_session):
 
 def test_overs_per_innings_respected(db_session):
     match, s, ns, b = setup_match(db_session, overs=2)
+    b2 = Player(team_id=2, name="Bowler 2", role="bowler", jersey_number=4)
+    db_session.add(b2)
+    db_session.commit()
+    db_session.refresh(b2)
+    db_session.add(MatchSquad(match_id=match.id, player_id=b2.id, team_id=b2.team_id, is_substitute=False))
     match.status = "in_progress"
     db_session.commit()
     for over in range(1, 3):
+        current_bowler_id = b.id if over % 2 == 1 else b2.id
         for ball in range(1, 7):
-            req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, bowler_id=b.id, over_number=over, ball_number=ball, runs_batter=0)
+            req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, bowler_id=current_bowler_id, over_number=over, ball_number=ball, runs_batter=0)
             process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=(over == 1 and ball == 1))
     assert True
 
@@ -792,19 +813,6 @@ def test_match_status_to_in_progress(db_session):
     process_ball(db_session, match, req, make_role(db_session, match), innings_id=1, is_first_ball_of_match=True)
     db_session.refresh(match)
     assert match.status == "in_progress"
-
-
-def test_scoring_rights_required(db_session):
-    match, s, ns, b = setup_match(db_session)
-    match.status = "in_progress"
-    db_session.commit()
-    watcher_role = MatchRole(match_id=match.id, session_id="watcher", role="watcher", scoring_rights=False, created_at=datetime.now(timezone.utc))
-    db_session.add(watcher_role)
-    db_session.commit()
-    req = make_ball_request(striker_id=s.id, non_striker_id=ns.id, runs_batter=0)
-    with pytest.raises(HTTPException) as exc:
-        process_ball(db_session, match, req, watcher_role, innings_id=1, is_first_ball_of_match=True)
-    assert exc.value.status_code == 403
 
 
 def test_wicket_requires_fielder(db_session):

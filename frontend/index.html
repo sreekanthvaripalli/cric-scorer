@@ -25,6 +25,15 @@
                 <p id="match-overs">Overs: <span id="overs-per-innings">—</span></p>
                 <p id="match-status" class="status">Status: <span id="status-text">—</span></p>
                 <p id="match-teams">Teams: <span id="team-a">—</span> vs <span id="team-b">—</span></p>
+                <p id="match-id-display">Match ID: <span id="match-id">—</span> <button id="copy-match-id" class="btn-copy">📋 Copy</button></p>
+            </section>
+
+            <!-- Scoring Rights Request UI (FR-9.6) -->
+            <section id="scoring-rights-section" class="card hidden">
+                <h2>🔐 Scoring Rights</h2>
+                <div id="scoring-rights-content">
+                    <p id="scoring-rights-status">Loading...</p>
+                </div>
             </section>
 
             <!-- Online Toss Section -->
@@ -83,6 +92,28 @@
                     <p id="mvp-loading">Loading MVP data...</p>
                 </div>
             </section>
+
+            <!-- Scorer Keypad -->
+            <section id="scorer-section" class="scorer-section card">
+                <h2>🏏 Score Delivery</h2>
+                <div class="keypad">
+                    <button id="btn-0" class="btn-run">0</button>
+                    <button id="btn-1" class="btn-run">1</button>
+                    <button id="btn-2" class="btn-run">2</button>
+                    <button id="btn-3" class="btn-run">3</button>
+                    <button id="btn-4" class="btn-boundary">4</button>
+                    <button id="btn-5" class="btn-run">5</button>
+                    <button id="btn-6" class="btn-boundary">6</button>
+                    <button id="btn-nb" class="btn-extra">No Ball</button>
+                    <button id="btn-wd" class="btn-extra">Wide</button>
+                    <button id="btn-bye" class="btn-extra">Bye</button>
+                    <button id="btn-wk" class="btn-wicket">Wicket</button>
+                    <button id="btn-undo" class="btn-undo">↩ Undo</button>
+                    <button id="btn-over-complete" class="btn-over">Over Complete</button>
+                </div>
+                <div id="status-log"></div>
+                <span id="offline-badge" class="offline-badge">0</span>
+            </section>
         </main>
 
         <footer class="footer">
@@ -91,6 +122,126 @@
     </div>
 
     <script src="js/toss.js"></script>
+    <script src="js/scorer.js"></script>
+    <script>
+      // FR-9.3: Display and copy Match ID
+      const apiBase = window.location.origin;
+      const params = new URLSearchParams(window.location.search);
+      const matchId = params.get("match_id") || window.location.pathname.split("/").pop();
+      const matchIdEl = document.getElementById("match-id");
+      const copyBtn = document.getElementById("copy-match-id");
+
+      if (matchIdEl) matchIdEl.textContent = matchId;
+      if (copyBtn) {
+        copyBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(matchId).then(() => {
+            copyBtn.textContent = "✅ Copied!";
+            setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 1500);
+          });
+        });
+      }
+
+      // FR-9.6: Scoring rights request / approve UI
+      async function loadScoringRights() {
+        try {
+          // Check if user is initiator by fetching match details
+          const matchResp = await fetch(`${apiBase}/matches/${matchId}`);
+          if (!matchResp.ok) return;
+          const matchData = await matchResp.json();
+
+          // Try to fetch scoring requests (initiator only)
+          const reqResp = await fetch(`${apiBase}/matches/${matchId}/scoring-requests`);
+          const content = document.getElementById("scoring-rights-content");
+          const section = document.getElementById("scoring-rights-section");
+
+          if (reqResp.ok) {
+            // User is initiator - show pending requests
+            section.classList.remove("hidden");
+            const requests = await reqResp.json();
+            let html = "<h3>Pending Scoring Requests</h3>";
+            if (!requests || requests.length === 0) {
+              html += "<p>No pending requests.</p>";
+            } else {
+              html += "<table><tr><th>Session</th><th>Device</th><th>Actions</th></tr>";
+              for (const r of requests) {
+                html += `<tr>
+                  <td>${r.requestor_session_id}</td>
+                  <td>${r.device_name || "—"}</td>
+                  <td>
+                    <button onclick="approveRequest(${r.id})" class="btn-approve">Approve</button>
+                    <button onclick="rejectRequest(${r.id})" class="btn-reject">Reject</button>
+                  </td>
+                </tr>`;
+              }
+              html += "</table>";
+            }
+            html += `<h3>Your Role: Initiator</h3><p>You created this match and have scoring rights.</p>`;
+            content.innerHTML = html;
+          } else {
+            // Non-initiator - show request button
+            section.classList.remove("hidden");
+            content.innerHTML = `
+              <h3>Request Scoring Rights</h3>
+              <p>You are not the initiator. Request approval to score for this match.</p>
+              <input type="text" id="device-name" placeholder="Your device name (e.g., Rahul's phone)" />
+              <button onclick="requestScoringRights()" class="btn-request">Request Scoring Rights</button>
+              <p id="request-status"></p>
+            `;
+          }
+        } catch (e) {
+          console.error("Failed to load scoring rights:", e);
+        }
+      }
+
+      window.requestScoringRights = async function() {
+        const deviceName = document.getElementById("device-name").value;
+        const statusEl = document.getElementById("request-status");
+        try {
+          const resp = await fetch(`${apiBase}/matches/${matchId}/request-scoring`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_name: deviceName }),
+          });
+          if (resp.ok) {
+            statusEl.textContent = "✅ Request sent! Waiting for initiator approval.";
+            statusEl.style.color = "green";
+            loadScoringRights();
+          } else {
+            const err = await resp.json();
+            statusEl.textContent = "❌ " + (err.detail || "Failed to request");
+            statusEl.style.color = "red";
+          }
+        } catch (e) {
+          statusEl.textContent = "❌ Error: " + e.message;
+          statusEl.style.color = "red";
+        }
+      };
+
+      window.approveRequest = async function(requestId) {
+        try {
+          const resp = await fetch(`${apiBase}/matches/${matchId}/scoring-requests/${requestId}/approve`, {
+            method: "POST",
+          });
+          if (resp.ok) {
+            loadScoringRights();
+          }
+        } catch (e) { console.error("Approve failed:", e); }
+      };
+
+      window.rejectRequest = async function(requestId) {
+        try {
+          const resp = await fetch(`${apiBase}/matches/${matchId}/scoring-requests/${requestId}/reject`, {
+            method: "POST",
+          });
+          if (resp.ok) {
+            loadScoringRights();
+          }
+        } catch (e) { console.error("Reject failed:", e); }
+      };
+
+      // Initialize scoring rights UI
+      loadScoringRights();
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').then(function(reg) {

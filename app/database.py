@@ -104,6 +104,21 @@ class Match(Base):
     locked_at = Column(DateTime(timezone=True), nullable=True)
     team_a_name = Column(String(150), nullable=False)  # stored at match creation
     team_b_name = Column(String(150), nullable=False)  # stored at match creation
+    innings_count = Column(Integer, nullable=False, default=0)
+    toss_winner_team_id = Column(Integer, nullable=True)
+    toss_decision = Column(String(10), nullable=True)  # 'bat' or 'field'
+    # Manual result override (Draw / Conceded / Awarded) — FR-6.5
+    result_type = Column(String(30), nullable=True)
+    winner_team_id_manual = Column(Integer, nullable=True)
+    margin_runs = Column(Integer, nullable=True, default=0)
+    margin_wickets = Column(Integer, nullable=True, default=0)
+    margin_text = Column(String(100), nullable=True)
+    team_a_runs = Column(Integer, nullable=True, default=0)
+    team_a_wickets = Column(Integer, nullable=True, default=0)
+    team_a_overs = Column(String(10), nullable=True, default="0.0")
+    team_b_runs = Column(Integer, nullable=True, default=0)
+    team_b_wickets = Column(Integer, nullable=True, default=0)
+    team_b_overs = Column(String(10), nullable=True, default="0.0")
 
 
 class MatchRole(Base):
@@ -133,8 +148,10 @@ class MatchRole(Base):
         DateTime(timezone=True), nullable=True
     )  # when approval happened
     created_at = Column(
-        DateTime(timezone=True), nullable=False
-    )  # when approval happened
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )  # when role was created
 
 # Module 3: Teams, players, squads & format config
 class Team(Base):
@@ -158,6 +175,7 @@ class Player(Base):
     __tablename__ = "players"
 
     id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=True)  # optional match_id
     team_id = Column(Integer, nullable=False)  # foreign key to teams.id
     name = Column(String(150), nullable=False)  # player name
     role = Column(
@@ -166,6 +184,7 @@ class Player(Base):
         default="all-rounder",  # batter / bowler / all-rounder / wicketkeeper
     )
     jersey_number = Column(Integer, nullable=True)  # 1-11 for the XI
+    is_substitute = Column(Boolean, nullable=True, default=False)
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -362,3 +381,79 @@ class MVP(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class Innings(Base):
+    """Innings model tracking an innings within a match."""
+
+    __tablename__ = "innings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False, index=True)
+    innings_number = Column(Integer, nullable=False)  # 1, 2, 3, 4
+    batting_team_id = Column(Integer, nullable=True)
+    bowling_team_id = Column(Integer, nullable=True)
+    target_runs = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="in_progress")  # in_progress, completed
+    total_runs = Column(Integer, nullable=False, default=0)
+    total_wickets = Column(Integer, nullable=False, default=0)
+    overs_bowled = Column(String(10), nullable=False, default="0.0")
+    result = Column(String(50), nullable=True)
+    result_margin = Column(String(100), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class Over(Base):
+    """Over model tracking an individual over."""
+
+    __tablename__ = "overs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    innings_id = Column(Integer, nullable=False, index=True)
+    over_number = Column(Integer, nullable=False)
+    bowler_id = Column(Integer, nullable=False)
+    end = Column(String(50), nullable=True)  # pavilion end, etc.
+    balls_valid = Column(Integer, nullable=False, default=0)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Wicket(Base):
+    """Wicket model tracking individual dismissals and fall of wickets."""
+
+    __tablename__ = "wickets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ball_id = Column(Integer, nullable=False, index=True)
+    dismissal_mode = Column(String(30), nullable=False)
+    batter_out_id = Column(Integer, nullable=False)
+    fielder_id = Column(Integer, nullable=True)
+    bowler_credit_id = Column(Integer, nullable=True)
+    not_out_batter_id = Column(Integer, nullable=True)
+    runs_at_fall = Column(Integer, nullable=False, default=0)
+    over_at_fall = Column(String(10), nullable=False, default="0.0")
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class ScoreSnapshot(Base):
+    """Point-in-time snapshot of the scorecard for audit and recovery."""
+
+    __tablename__ = "score_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, nullable=False, index=True)
+    generated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    payload_json = Column(Text, nullable=False)
+    checksum = Column(String(64), nullable=False)
+
