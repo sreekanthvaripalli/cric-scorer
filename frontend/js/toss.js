@@ -8,7 +8,6 @@
  */
 
 const API_BASE = window.location.origin;
-let matchId = null;
 let matchData = null;
 
 const tossPhase1 = document.getElementById('toss-phase-1');

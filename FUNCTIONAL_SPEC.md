@@ -196,18 +196,63 @@ When any anonymous user wants to score for a match, they must send a scoring-rig
 | FR-8.5 | `POST /import/json` — restore match from JSON |
 | FR-8.6 | Auto-backup before major mutations |
 
-### 4.9 PWA Frontend
+### 4.9 PWA Frontend (React + Vite)
+
+The frontend is built with **React + Vite** for component isolation, build-time error checking, and maintainable code. All FR-9.x requirements below are implemented as React components.
 
 | ID | Requirement |
 |----|-------------|
-| FR-9.1 | `manifest.json` — installable to home screen |
-| FR-9.2 | `sw.js` — service worker, offline queue, sync on reconnect |
+| FR-9.1 | `manifest.json` — installable to home screen (served from `/frontend/dist` after build) |
+| FR-9.2 | `sw.js` — service worker via `vite-plugin-pwa`, offline queue, sync on reconnect |
 | FR-9.3 | Initiator dashboard: create match with team names → shows Match ID + share link |
-| FR-9.4 | Scorer UI: touch buttons (0–6, NB, WD, Bye, Leg bye, Wicket), undo, over complete |
+| FR-9.4 | Scorer UI: React component with touch buttons (0–6, NB, WD, Bye, Leg bye, Wicket), undo, over complete |
 | FR-9.5 | Watcher UI: enter Match ID → live read-only scoreboard |
 | FR-9.6 | Request/approve scoring rights UI |
 | FR-9.7 | IndexedDB fallback for offline scoring |
-| FR-9.8 | No external CDN assets |
+| FR-9.8 | No external CDN assets — all bundles self-contained after Vite build |
+
+### Frontend Tech Stack
+
+| Layer | Choice | Cost |
+|-------|--------|------|
+| Framework | React 18+ | $0 |
+| Build tool | Vite | $0 |
+| Styling | Plain CSS (no framework CDN) | $0 |
+| PWA | `vite-plugin-pwa` (service worker + offline cache) | $0 |
+| State | React Context / Zustand | $0 |
+| HTTP client | `fetch` (native) | $0 |
+
+### Frontend Directory Structure (post-migration)
+
+```
+frontend/
+├── index.html          # Vite entry point
+├── manifest.json       # PWA install manifest
+├── src/
+│   ├── main.jsx        # React app entry
+│   ├── App.jsx         # Router + layout
+│   ├── components/     # Reusable UI components
+│   │   ├── MatchCreate.jsx
+│   │   ├── ScorerKeypad.jsx
+│   │   ├── TossWidget.jsx
+│   │   ├── WatcherPage.jsx
+│   │   ├── Scorecard.jsx
+│   │   └── MVPDisplay.jsx
+│   ├── pages/          # Page-level components
+│   │   ├── HomePage.jsx        # Create match form
+│   │   ├── MatchPage.jsx       # Match detail + scoring
+│   │   └── WatchPage.jsx       # Read-only watcher
+│   ├── hooks/          # Custom React hooks
+│   │   ├── useMatch.js
+│   │   ├── useScoring.js
+│   │   └──useWebSocket.js
+│   ├── services/       # API client functions
+│   │   └── api.js      # fetch wrappers for all endpoints
+│   ├── store/          # State management (Zustand or Context)
+│   └── utils/          # Helper functions
+├── vite.config.js      # Vite config + PWA plugin
+└── dist/               # Build output (gitignored)
+```
 
 ### 4.10 Audit & Security
 
@@ -332,7 +377,24 @@ Any change to the presumptions in Section 2 requires:
 
 ---
 
-## 11. Known Implementation Gaps (v1)
+## 11. Database Environments
+
+| Environment | Database | `DATABASE_URL` | Persistence | Purpose |
+|-------------|----------|----------------|-------------|---------|
+| **Local development / testing** | In-memory SQLite | `sqlite:///:memory:` | ❌ Lost on server stop/reload | Throwaway testing only; fresh state every run |
+| **Local production use** | File-based SQLite | `sqlite:///./cric_scorer.db` | ✅ Persists across restarts | Real local matches; single device |
+| **Cloud deployment** | PostgreSQL (free tier) | `postgresql://user:pass@host:port/db` | ✅ Persistent | Shared matches, multi-device access |
+
+**Important:** The in-memory SQLite database (`sqlite:///:memory:`) is **only** for local development and testing. It must **never** be used in a deployment environment because:
+- All match data is lost when the server process stops
+- All match data is lost on code reload
+- Each server instance gets an isolated database (no sharing across workers)
+
+For any deployment (Render, PythonAnywhere, Supabase, Neon, etc.), set `DATABASE_URL` to a persistent database server (PostgreSQL recommended on free tiers).
+
+---
+
+## 12. Known Implementation Gaps (v1)
 
 The following requirements from Section 4 are partially implemented or pending completion:
 

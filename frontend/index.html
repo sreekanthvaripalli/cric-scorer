@@ -4,10 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a1a2e">
-    <link rel="manifest" href="manifest.json">
+    <meta http-equiv="cache-control" content="max-age=0, no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+    <link rel="manifest" href="manifest.json?v=1">
     <title>Cric-Scorer — Match</title>
-    <link rel="stylesheet" href="css/toss.css">
-    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/toss.css?v=1">
+    <link rel="stylesheet" href="css/global.css?v=1">
+    <style>
+        .create-match-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .create-match-form input,
+        .create-match-form select {
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .create-match-form input:focus,
+        .create-match-form select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .create-match-form .full-width {
+            grid-column: 1 / -1;
+        }
+        .create-match-btn {
+            grid-column: 1 / -1;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            background: #27ae60;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .create-match-btn:hover {
+            background: #219150;
+        }
+        .create-match-btn:active {
+            transform: scale(0.98);
+        }
+        .no-match-cta {
+            text-align: center;
+            color: #666;
+            margin-top: 8px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -17,8 +66,44 @@
         </header>
 
         <main class="main">
-            <!-- Match Info -->
-            <section class="match-info card">
+            <!-- ===== CREATE MATCH (shown when no match ID) ===== -->
+            <section id="create-match-section" class="card">
+                <h2>Create New Match</h2>
+                <form id="create-match-form" class="create-match-form">
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:600;">Team A Name</label>
+                        <input type="text" id="create-team-a" placeholder="e.g. India" required value="Team A">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:600;">Team B Name</label>
+                        <input type="text" id="create-team-b" placeholder="e.g. Australia" required value="Team B">
+                    </div>
+                    <div class="full-width">
+                        <label style="display:block; margin-bottom:6px; font-weight:600;">Format</label>
+                        <select id="create-format">
+                            <option value="T20">T20 (20 overs)</option>
+                            <option value="ODI">ODI (50 overs)</option>
+                            <option value="Test">Test (unlimited overs)</option>
+                            <option value="Custom">Custom</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:600;">Overs per Innings</label>
+                        <input type="number" id="create-overs" value="20" min="1" max="500" required>
+                    </div>
+                    <div class="full-width">
+                        <label style="display:block; margin-bottom:6px; font-weight:600;">Balls per Over</label>
+                        <input type="number" id="create-balls" value="6" min="1" max="10" required>
+                    </div>
+                    <button type="submit" class="create-match-btn">🏏 Create Match</button>
+                </form>
+                <p class="no-match-cta">Create a match to start scoring. You'll get a Match ID to share with scorers and watchers.</p>
+            </section>
+
+            <!-- ===== MATCH DETAILS (shown when match ID exists) ===== -->
+            <section id="match-details-section" class="card hidden">
+                <!-- Match Info -->
+                <div class="match-info">
                 <h2>Match Details</h2>
                 <p id="match-name">Loading...</p>
                 <p id="match-format">Format: <span id="format-name">—</span></p>
@@ -26,7 +111,7 @@
                 <p id="match-status" class="status">Status: <span id="status-text">—</span></p>
                 <p id="match-teams">Teams: <span id="team-a">—</span> vs <span id="team-b">—</span></p>
                 <p id="match-id-display">Match ID: <span id="match-id">—</span> <button id="copy-match-id" class="btn-copy">📋 Copy</button></p>
-            </section>
+                </div>
 
             <!-- Scoring Rights Request UI (FR-9.6) -->
             <section id="scoring-rights-section" class="card hidden">
@@ -114,6 +199,7 @@
                 <div id="status-log"></div>
                 <span id="offline-badge" class="offline-badge">0</span>
             </section>
+        </section>
         </main>
 
         <footer class="footer">
@@ -121,25 +207,102 @@
         </footer>
     </div>
 
-    <script src="js/toss.js"></script>
-    <script src="js/scorer.js"></script>
+    <script src="js/toss.js?v=1"></script>
+    <script src="js/scorer.js?v=1"></script>
     <script>
-      // FR-9.3: Display and copy Match ID
+      // ── Determine if we have a valid numeric match ID ──
       const apiBase = window.location.origin;
       const params = new URLSearchParams(window.location.search);
-      const matchId = params.get("match_id") || window.location.pathname.split("/").pop();
-      const matchIdEl = document.getElementById("match-id");
-      const copyBtn = document.getElementById("copy-match-id");
+      const urlMatchId = params.get("match_id");
+      const pathMatchId = window.location.pathname.split("/").pop();
+      const isNumericId = (s) => /^\d+$/.test(s);
 
-      if (matchIdEl) matchIdEl.textContent = matchId;
-      if (copyBtn) {
-        copyBtn.addEventListener("click", () => {
-          navigator.clipboard.writeText(matchId).then(() => {
-            copyBtn.textContent = "✅ Copied!";
-            setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 1500);
-          });
+      let matchId = (urlMatchId && isNumericId(urlMatchId)) ? urlMatchId :
+                      (pathMatchId && isNumericId(pathMatchId) && pathMatchId !== "index.html") ? pathMatchId :
+                      null;
+
+      const createMatchSection = document.getElementById("create-match-section");
+      const matchDetailsSection = document.getElementById("match-details-section");
+
+      // ── No match ID → show Create Match form ──
+      if (!matchId) {
+        createMatchSection.classList.remove("hidden");
+        matchDetailsSection.classList.add("hidden");
+
+        const form = document.getElementById("create-match-form");
+        const formatSelect = document.getElementById("create-format");
+        const oversInput = document.getElementById("create-overs");
+
+        formatSelect.addEventListener("change", () => {
+          if (formatSelect.value === "T20") oversInput.value = 20;
+          else if (formatSelect.value === "ODI") oversInput.value = 50;
+          else if (formatSelect.value === "Test") oversInput.value = 90;
+        });
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = form.querySelector(".create-match-btn");
+          const originalText = btn.textContent;
+          btn.textContent = "Creating...";
+          btn.disabled = true;
+
+          try {
+            const resp = await fetch(`${apiBase}/matches`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                team_a_name: document.getElementById("create-team-a").value,
+                team_b_name: document.getElementById("create-team-b").value,
+                format: formatSelect.value,
+                overs_per_innings: parseInt(oversInput.value),
+                balls_per_over: parseInt(document.getElementById("create-balls").value),
+              }),
+            });
+
+            if (!resp.ok) {
+              const err = await resp.json();
+              throw new Error(err.detail || "Failed to create match");
+            }
+
+            const data = await resp.json();
+            window.location.href = `index.html?match_id=${data.id}`;
+          } catch (err) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            alert("❌ " + err.message);
+          }
         });
       }
+
+      // ── Only run match-details code when we have a match ID ──
+      if (matchId) {
+        if (matchIdEl) matchIdEl.textContent = matchId;
+        if (copyBtn) {
+          copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(matchId).then(() => {
+              copyBtn.textContent = "✅ Copied!";
+              setTimeout(() => { copyBtn.textContent = "📋 Copy"; }, 1500);
+            });
+          });
+        }
+
+      async function loadMatchDetails() {
+        try {
+          const resp = await fetch(`${apiBase}/matches/${matchId}`);
+          if (!resp.ok) throw new Error("Match not found");
+          const data = await resp.json();
+          document.getElementById("match-name").textContent = data.name;
+          document.getElementById("format-name").textContent = data.format;
+          document.getElementById("overs-per-innings").textContent = data.overs_per_innings;
+          document.getElementById("status-text").textContent = data.status;
+          document.getElementById("team-a").textContent = data.team_a_name;
+          document.getElementById("team-b").textContent = data.team_b_name;
+        } catch (e) {
+          console.error("Failed to load match:", e);
+          document.getElementById("match-name").textContent = "Error loading match";
+        }
+      }
+      loadMatchDetails();
 
       // FR-9.6: Scoring rights request / approve UI
       async function loadScoringRights() {
@@ -241,6 +404,7 @@
 
       // Initialize scoring rights UI
       loadScoringRights();
+      }
     </script>
     <script>
       if ('serviceWorker' in navigator) {

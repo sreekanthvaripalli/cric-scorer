@@ -14,6 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.pool import StaticPool
 
 Base = declarative_base()
 
@@ -27,6 +28,7 @@ DATABASE_URL = os.environ.get(
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    poolclass=StaticPool if DATABASE_URL == "sqlite:///:memory:" else None,
 )
 
 session_local = scoped_session(
