@@ -205,27 +205,39 @@
 
 ---
 
-## Module 8 — Offline-first PWA frontend
+## Module 8 — Offline-first PWA frontend (React + Vite)
 
-**Dependencies:** Modules 2-5
-**Deliverable:** Installable PWA scorer + watcher, offline capable
+**Dependencies:** Modules 2-5  
+**Deliverable:** Installable React PWA scorer + watcher, offline capable
 
-- [x] 8.1 manifest.json — Install to home screen on Android/iOS/desktop
+- [ ] 8.1 Initialize React + Vite project in `frontend/`
+  - `npm create vite@latest frontend -- --template react`
+  - Install dependencies: `vite-plugin-pwa`, `zustand` (or use React Context)
+  > Done when: `npm install` succeeds and `npm run dev` starts dev server
+- [ ] 8.2 `vite.config.js` — configure Vite + PWA plugin
+  - Set base to `/` for development, `/` for production
+  - Configure `vite-plugin-pwa` for service worker + offline cache
+  > Done when: `npm run build` produces `dist/` with service worker
+- [ ] 8.3 `manifest.json` — Install to home screen on Android/iOS/desktop
   > Done when: PWA installable
-- [x] 8.2 sw.js — service worker caches shell (HTML/CSS/JS), offline scoring queue, sync on reconnect
+- [ ] 8.4 `sw.js` via `vite-plugin-pwa` — caches shell (HTML/CSS/JS), offline scoring queue, sync on reconnect
   > Done when: Works offline after first visit
-- [x] 8.3 Initiator dashboard: create match -> shows Match ID + share link + scoring UI
+- [ ] 8.5 `HomePage.jsx` — Initiator dashboard: create match → shows Match ID + share link + scoring UI
   > Done when: Initiator can start match
-- [x] 8.4 Scorer UI: big touch buttons (0-6, NB, WD, Bye, Leg bye, Wicket), bowler/striker selection, undo, over complete
+- [ ] 8.6 `MatchPage.jsx` — Match detail + scoring UI with touch buttons (0–6, NB, WD, Bye, Leg bye, Wicket), bowler/striker selection, undo, over complete
   > Done when: Touch-friendly scoring
-- [x] 8.5 Watcher UI: enter Match ID -> live read-only scoreboard; auto-updates via WS or polling
+- [ ] 8.7 `WatchPage.jsx` — Watcher UI: enter Match ID → live read-only scoreboard; auto-updates via WS or polling
   > Done when: Watch by ID works
-- [x] 8.6 Request scoring UI: Request scoring rights button; initiator sees approve/reject list
+- [ ] 8.8 Request scoring UI — Request scoring rights button; initiator sees approve/reject list
   > Done when: Request/approve flow in UI
-- [x] 8.7 IndexedDB fallback queue for deliveries when offline; flush to server/DB on reconnect
+- [ ] 8.9 IndexedDB fallback queue for deliveries when offline; flush to server/DB on reconnect
   > Done when: Offline scoring syncs later
-- [x] 8.8 No external CDN assets; high-contrast sunlight-friendly CSS
+- [ ] 8.10 No external CDN assets; high-contrast sunlight-friendly CSS
   > Done when: Fully offline capable
+- [ ] 8.11 API service layer (`src/services/api.js`) — fetch wrappers for all backend endpoints
+  > Done when: All API calls go through centralized service layer
+- [ ] 8.12 State management (`src/store/`) — match state, scoring state, auth/session state
+  > Done when: State persists across page reloads via localStorage/IndexedDB
 
 ---
 

@@ -41,7 +41,8 @@ Cric-Scorer is a ball-by-ball cricket scoring application designed for cricketer
 | Web framework | FastAPI | $0 |
 | ORM / DB | SQLAlchemy + SQLite (default) | $0 |
 | Cloud DB (optional) | PostgreSQL via `DATABASE_URL` (Supabase / Neon / Render free tier) | $0 (free tiers) |
-| Frontend | Vanilla HTML5 + JS + CSS (no build step, no CDN) | $0 |
+| **Frontend** | **React 18+ + Vite** | **$0** |
+| PWA | `vite-plugin-pwa` | $0 |
 | PDF export | ReportLab | $0 |
 
 ---
@@ -49,25 +50,51 @@ Cric-Scorer is a ball-by-ball cricket scoring application designed for cricketer
 ## 4. How to Run Locally
 
 ### Prerequisites
-- Python 3.10+ installed
+- Python 3.10+
 - `pip` available
+- Node.js 18+ and `npm` (for React frontend)
 
 ### Step 1 — Clone / open the folder
 ```bash
 cd /Users/ai/Documents/sourceCode/cric-scorer
 ```
 
-### Step 2 — Install dependencies
+### Step 2 — Install Python dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 3 — Start the server
+### Step 3 — Install frontend dependencies
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### Step 4 — Start the backend server
 ```bash
 python scripts/run_local.py
 ```
+The server starts on **http://localhost:8000**.
 
-**Database note:** `scripts/run_local.py` uses **in-memory SQLite** by default (`sqlite:///:memory:`). All match data is lost when the server stops or reloads — this is fine for throwaway testing, but **not for real matches you want to keep**.
+### Step 5 — Start the frontend dev server
+In a new terminal:
+```bash
+cd frontend
+npm run dev
+```
+The frontend starts on **http://localhost:5173** (Vite default).
+
+### Step 6 — Build frontend for production
+When ready to deploy or test production build:
+```bash
+cd frontend
+npm run build
+```
+Output goes to `frontend/dist/`. Serve via any static host or the FastAPI static file handler.
+
+### Database note
+`scripts/run_local.py` uses **in-memory SQLite** by default (`sqlite:///:memory:`). All match data is lost when the server stops or reloads — this is fine for throwaway testing, but **not for real matches you want to keep**.
 
 To use persistent local storage instead, edit `scripts/run_local.py` and remove/comment the line:
 ```python
@@ -75,16 +102,15 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 ```
 Then the app will fall back to file-based SQLite (`cric_scorer.db`) and your matches will persist across restarts.
 
-The server starts on **http://localhost:8000**
-
-### Step 4 — Use the app
-1. **Create a match** — enter team names, format (T20/ODI/Test/Custom), overs per innings
-2. **Copy the Match ID** and share it with your scorer or watchers
-3. **Toss** — initiator calls heads/tails → flip → winner chooses bat/field
-4. **Scoring rights** — non-initiators request scoring rights; initiator approves/rejects
-5. **Score** — tap 0–6, NB, WD, Bye, Wicket, Undo, Over Complete
-6. **Watch** — open `/watch/{matchId}` on another device for read-only live scoreboard
-7. **Finish** → Confirm scores → Lock match → Award MVP → Export scorecard (JSON/CSV/PDF)
+### Step 7 — Use the app
+1. Open **http://localhost:5173** (React frontend)
+2. **Create a match** — enter team names, format (T20/ODI/Test/Custom), overs per innings
+3. **Copy the Match ID** and share it with your scorer or watchers
+4. **Toss** — initiator calls heads/tails → flip → winner chooses bat/field
+5. **Scoring rights** — non-initiators request scoring rights; initiator approves/rejects
+6. **Score** — tap 0–6, NB, WD, Bye, Wicket, Undo, Over Complete
+7. **Watch** — open another device/browser with the Match ID for read-only live scoreboard
+8. **Finish** → Confirm scores → Lock match → Award MVP → Export scorecard (JSON/CSV/PDF)
 
 ### Health check
 ```bash
@@ -117,6 +143,50 @@ export DATABASE_URL=sqlite:///./cric_scorer.db
 
 ### Option A — Render (recommended free web service)
 
+Deploy the FastAPI backend on Render, and the React frontend on Vercel or Netlify.
+
+**Backend (Render):**
+1. Push repo to GitHub
+2. Create a **Web Service** on Render, connect the repo
+3. Add environment variable: `DATABASE_URL` (free PostgreSQL add-on URL)
+4. Build command: `pip install -r requirements.txt`
+5. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+6. Your backend URL: `https://your-app.onrender.com`
+
+**Frontend (Vercel or Netlify):**
+1. Push `frontend/` folder to GitHub
+2. Connect to Vercel/Netlify
+3. Build command: `cd frontend && npm install && npm run build`
+4. Publish directory: `frontend/dist`
+5. Set environment variable: `VITE_API_BASE_URL=https://your-app.onrender.com`
+6. Your frontend URL: `https://your-app.vercel.app`
+
+**CORS:** Add your frontend URL to FastAPI CORS middleware in `app/main.py`.
+
+### Option B — PythonAnywhere (beginner-friendly Python hosting)
+
+1. Upload repo to PythonAnywhere
+2. Set `DATABASE_URL` in environment variables (SQLite path or free PostgreSQL)
+3. Configure WSGI to serve `app.main:app`
+4. Access via your free `username.pythonanywhere.com` subdomain
+5. Serve React `dist/` files as static files or host separately on Vercel/Netlify
+
+### Option C — Supabase / Neon (free managed PostgreSQL)
+
+1. Create a free PostgreSQL database on [Supabase](https://supabase.com) or [Neon](https://neon.tech)
+2. Copy the connection string
+3. Set `DATABASE_URL=<connection_string>` as an environment variable
+4. Deploy the FastAPI backend to any host (Render, Koyeb, Fly.io, Oracle Cloud Always Free)
+5. Deploy React frontend (`dist/`) to GitHub Pages, Netlify, Vercel, or Cloudflare Pages pointing at the backend API
+
+### Recommended zero-dollar path
+> **Develop locally with SQLite** (no deploy needed for solo/ground use).  
+> **If sharing matches online:** deploy backend to Render/PythonAnywhere + Supabase/Neon free PostgreSQL, React frontend on Vercel/Netlify.
+
+---
+
+## 6. Project Structure (React Migration)
+
 ```
 cric-scorer/
 ├── app/
@@ -128,13 +198,33 @@ cric-scorer/
 │   │   └── engine.py        # Core scoring state machine & Laws of Cricket validation
 │   └── test.txt, test2.txt  # orphan files (safe to ignore)
 ├── frontend/
-│   ├── index.html           # Match page: scorer UI + toss + scoring rights UI
-│   ├── watch.html           # Public watcher page (read-only)
+│   ├── index.html           # Vite entry point
 │   ├── manifest.json        # PWA install manifest
-│   ├── sw.js                # Service worker (offline cache + sync)
-│   ├── css/                 # global.css, live.css, toss.css
-│   ├── js/                  # scorer.js, live.js, watch.js, toss.js
-│   └── icons/               # PWA icons (icon-192.png, icon-512.png)
+│   ├── vite.config.js       # Vite config + PWA plugin
+│   ├── package.json         # Frontend dependencies
+│   ├── dist/                # Build output (gitignored)
+│   └── src/
+│       ├── main.jsx         # React app entry
+│       ├── App.jsx          # Router + layout
+│       ├── components/
+│       │   ├── MatchCreate.jsx
+│       │   ├── ScorerKeypad.jsx
+│       │   ├── TossWidget.jsx
+│       │   ├── WatcherPage.jsx
+│       │   ├── Scorecard.jsx
+│       │   └── MVPDisplay.jsx
+│       ├── pages/
+│       │   ├── HomePage.jsx        # Create match form
+│       │   ├── MatchPage.jsx       # Match detail + scoring
+│       │   └── WatchPage.jsx       # Read-only watcher
+│       ├── hooks/
+│       │   ├── useMatch.js
+│       │   ├── useScoring.js
+│       │   └── useWebSocket.js
+│       ├── services/
+│       │   └── api.js      # fetch wrappers for all API endpoints
+│       ├── store/          # State management (Zustand or Context)
+│       └── utils/          # Helper functions
 ├── scripts/
 │   └── run_local.py         # Local launcher (port 8000, init_db)
 ├── rulebook/                # MCC Laws + ICC playing conditions PDFs
@@ -151,7 +241,9 @@ cric-scorer/
 ├── .env.example             # Environment variables template
 ├── cric_scorer.db           # SQLite database (created on first run)
 └── README.md                # This file
-```
+
+---
+
 
 ---
 
